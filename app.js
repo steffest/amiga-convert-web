@@ -1523,6 +1523,8 @@ function updateViewMode() {
 
   if (zoomLevel === "fit") {
     // For fit mode, use responsive CSS approach
+    const isStacked = viewMode === "stacked";
+
     allCanvases.forEach((canvas) => {
       if (!canvas) return;
 
@@ -1530,7 +1532,8 @@ function updateViewMode() {
       canvas.style.width = "100%";
       canvas.style.height = "auto";
       canvas.style.maxWidth = "100%";
-      canvas.style.maxHeight = "100%";
+      // In stacked mode, each canvas gets 50% of height
+      canvas.style.maxHeight = isStacked ? "50%" : "100%";
       canvas.style.objectFit = "contain";
     });
   } else {
@@ -1659,6 +1662,10 @@ function loadImageFile(file) {
 
       document.getElementById("canvasDisplay").classList.add("has-image");
       document.getElementById("canvasGrid").style.display = "grid";
+
+      // Show "Change Image" button
+      document.getElementById("changeImageBtn").style.display = "block";
+
       convertImage();
     };
     img.src = event.target.result;
@@ -1666,11 +1673,36 @@ function loadImageFile(file) {
   reader.readAsDataURL(file);
 }
 
+// Initialize page state on load
+window.addEventListener("DOMContentLoaded", () => {
+  // Reset to empty state
+  document.getElementById("downloadBtn").disabled = true;
+  document.getElementById("changeImageBtn").style.display = "none";
+  document.getElementById("canvasDisplay").classList.remove("has-image");
+  document.getElementById("canvasGrid").style.display = "none";
+
+  // Clear any persisted file input
+  document.getElementById("imageInput").value = "";
+
+  // Reset window state
+  window.sourceImage = null;
+});
+
 // Event listeners
 document.getElementById("imageInput").addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
   loadImageFile(file);
+});
+
+// Make drop message clickable
+document.getElementById("dropMessage").addEventListener("click", () => {
+  document.getElementById("imageInput").click();
+});
+
+// Change Image button
+document.getElementById("changeImageBtn").addEventListener("click", () => {
+  document.getElementById("imageInput").click();
 });
 
 // Show/hide Bayer size control

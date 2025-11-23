@@ -218,6 +218,18 @@
           cursor: not-allowed;
       }
 
+      .secondary-btn {
+          background: transparent;
+          border: 1px solid #404040;
+          color: #c0c0c0;
+      }
+
+      .secondary-btn:hover {
+          background: #2a2a2a;
+          border-color: #4a9eff;
+          color: #e0e0e0;
+      }
+
       .value-display {
           display: inline-block;
           float: right;
@@ -250,6 +262,12 @@
       .preview-controls-left > div {
           display: flex;
           gap: 6px;
+          align-items: center;
+      }
+
+      .preview-controls-right {
+          display: flex;
+          gap: 8px;
           align-items: center;
       }
 
@@ -308,7 +326,13 @@
           color: #808080;
           font-size: 14px;
           text-align: center;
-          pointer-events: none;
+          cursor: pointer;
+          padding: 20px;
+          transition: color 0.2s;
+      }
+
+      .drop-message:hover {
+          color: #4a9eff;
       }
 
       .canvas-display.has-image .drop-message {
@@ -351,7 +375,7 @@
 
       .canvas-scroll {
           overflow: auto;
-          max-height: calc(100vh-80px);
+          max-height: calc(100vh - 80px);
           background: #1a1a1a;
           border-radius: 4px;
       }
@@ -621,33 +645,6 @@
 
       .add-color-content button {
           flex: 1;
-      }
-
-      .file-input-wrapper {
-          position: relative;
-          overflow: hidden;
-      }
-
-      .file-input-wrapper input[type="file"] {
-          position: absolute;
-          left: -9999px;
-      }
-
-      .file-input-label {
-          display: block;
-          width: 100%;
-          padding: 10px;
-          background: #1a1a1a;
-          border: 2px dashed #404040;
-          border-radius: 4px;
-          text-align: center;
-          cursor: pointer;
-          transition: border-color 0.2s;
-          font-size: 13px;
-      }
-
-      .file-input-label:hover {
-          border-color: #4a9eff;
       }
 
       .status {

@@ -12,16 +12,6 @@
       <div class="main-layout">
         <div class="controls">
           <div class="control-group">
-            <h3>Image</h3>
-            <div class="file-input-wrapper">
-              <input type="file" id="imageInput" accept="image/*" />
-              <label for="imageInput" class="file-input-label">
-                Choose Image
-              </label>
-            </div>
-          </div>
-
-          <div class="control-group">
             <h3>Conversion</h3>
             <div class="control-item">
               <label>Colors</label>
@@ -96,6 +86,39 @@
                 <option value="4">4x4</option>
                 <option value="8" selected>8x8</option>
               </select>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <h3>Resize</h3>
+            <div class="control-group-content">
+              <div class="control-item">
+                <div class="resize-inputs">
+                  <input
+                    type="number"
+                    id="resizeWidth"
+                    min="1"
+                    max="4096"
+                    value="320"
+                    placeholder="Width"
+                  />
+                  <span class="resize-separator">×</span>
+                  <input
+                    type="number"
+                    id="resizeHeight"
+                    min="1"
+                    max="4096"
+                    value="256"
+                    placeholder="Height"
+                  />
+                </div>
+              </div>
+              <div class="control-item">
+                <label>
+                  <input type="checkbox" id="aspectRatioLock" checked />
+                  Lock Aspect Ratio
+                </label>
+              </div>
             </div>
           </div>
 
@@ -231,39 +254,6 @@
               </div>
             </div>
           </div>
-
-          <div class="control-group">
-            <h3>Resize</h3>
-            <div class="control-group-content">
-              <div class="control-item">
-                <div class="resize-inputs">
-                  <input
-                    type="number"
-                    id="resizeWidth"
-                    min="1"
-                    max="4096"
-                    value="320"
-                    placeholder="Width"
-                  />
-                  <span class="resize-separator">×</span>
-                  <input
-                    type="number"
-                    id="resizeHeight"
-                    min="1"
-                    max="4096"
-                    value="256"
-                    placeholder="Height"
-                  />
-                </div>
-              </div>
-              <div class="control-item">
-                <label>
-                  <input type="checkbox" id="aspectRatioLock" checked />
-                  Lock Aspect Ratio
-                </label>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div class="canvas-container">
@@ -291,12 +281,27 @@
               </div>
             </div>
 
-            <button id="downloadBtn" disabled>Download Result</button>
+            <div class="preview-controls-right">
+              <button
+                id="changeImageBtn"
+                class="secondary-btn"
+                style="display: none"
+              >
+                Change Image
+              </button>
+              <button id="downloadBtn" disabled>Download Result</button>
+            </div>
           </div>
 
           <div class="canvas-display" id="canvasDisplay">
-            <div class="drop-message">
-              Drop an image here or use "Choose Image" button
+            <input
+              type="file"
+              id="imageInput"
+              accept="image/*"
+              style="display: none"
+            />
+            <div class="drop-message" id="dropMessage">
+              Drop an image here or click to choose
             </div>
 
             <div
