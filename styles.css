@@ -325,6 +325,10 @@
           grid-template-columns: 1fr 1fr;
       }
 
+      .canvas-grid.stacked {
+          grid-template-columns: 1fr;
+      }
+
       .canvas-grid.original-only,
       .canvas-grid.preview-only {
           grid-template-columns: 1fr;
