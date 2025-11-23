@@ -64,16 +64,16 @@ const curvesEditor = {
   calculateHistogram(imageData) {
     const data = imageData.data;
     const hist = {
-      r: new Array(256).fill(0),
-      g: new Array(256).fill(0),
-      b: new Array(256).fill(0),
+      red: new Array(256).fill(0),
+      green: new Array(256).fill(0),
+      blue: new Array(256).fill(0),
       rgb: new Array(256).fill(0),
     };
 
     for (let i = 0; i < data.length; i += 4) {
-      hist.r[data[i]]++;
-      hist.g[data[i + 1]]++;
-      hist.b[data[i + 2]]++;
+      hist.red[data[i]]++;
+      hist.green[data[i + 1]]++;
+      hist.blue[data[i + 2]]++;
       const luma = Math.round(
         0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2],
       );
@@ -81,14 +81,14 @@ const curvesEditor = {
     }
 
     // Normalize
-    const maxR = Math.max(...hist.r);
-    const maxG = Math.max(...hist.g);
-    const maxB = Math.max(...hist.b);
+    const maxR = Math.max(...hist.red);
+    const maxG = Math.max(...hist.green);
+    const maxB = Math.max(...hist.blue);
     const maxRGB = Math.max(...hist.rgb);
 
-    hist.r = hist.r.map((v) => v / maxR);
-    hist.g = hist.g.map((v) => v / maxG);
-    hist.b = hist.b.map((v) => v / maxB);
+    hist.red = hist.red.map((v) => v / maxR);
+    hist.green = hist.green.map((v) => v / maxG);
+    hist.blue = hist.blue.map((v) => v / maxB);
     hist.rgb = hist.rgb.map((v) => v / maxRGB);
 
     this.histogram = hist;
