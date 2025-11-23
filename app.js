@@ -1,0 +1,2321 @@
+// Curves Editor
+const curvesEditor = {
+  canvas: null,
+  ctx: null,
+  currentChannel: "rgb",
+  curves: {
+    rgb: [
+      [0, 0],
+      [255, 255],
+    ],
+    red: [
+      [0, 0],
+      [255, 255],
+    ],
+    green: [
+      [0, 0],
+      [255, 255],
+    ],
+    blue: [
+      [0, 0],
+      [255, 255],
+    ],
+  },
+  histogram: null,
+  draggingPoint: null,
+
+  init() {
+    this.canvas = document.getElementById("curvesCanvas");
+    this.ctx = this.canvas.getContext("2d");
+
+    // Mouse events
+    this.canvas.addEventListener("mousedown", (e) => this.onMouseDown(e));
+    this.canvas.addEventListener("mousemove", (e) => this.onMouseMove(e));
+    this.canvas.addEventListener("mouseup", () => this.onMouseUp());
+    this.canvas.addEventListener("mouseleave", () => this.onMouseUp());
+    this.canvas.addEventListener("dblclick", (e) => this.onDoubleClick(e));
+
+    // Channel selector
+    document.querySelectorAll(".curves-channel-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document
+          .querySelectorAll(".curves-channel-btn")
+          .forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        this.currentChannel = btn.dataset.channel;
+        this.draw();
+      });
+    });
+
+    // Reset button
+    document.getElementById("curvesReset").addEventListener("click", () => {
+      this.curves[this.currentChannel] = [
+        [0, 0],
+        [255, 255],
+      ];
+      this.draw();
+      convertImage(); // Real-time update
+    });
+
+    // Draw initial state
+    this.draw();
+  },
+
+  calculateHistogram(imageData) {
+    const data = imageData.data;
+    const hist = {
+      r: new Array(256).fill(0),
+      g: new Array(256).fill(0),
+      b: new Array(256).fill(0),
+      rgb: new Array(256).fill(0),
+    };
+
+    for (let i = 0; i < data.length; i += 4) {
+      hist.r[data[i]]++;
+      hist.g[data[i + 1]]++;
+      hist.b[data[i + 2]]++;
+      const luma = Math.round(
+        0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2],
+      );
+      hist.rgb[luma]++;
+    }
+
+    // Normalize
+    const maxR = Math.max(...hist.r);
+    const maxG = Math.max(...hist.g);
+    const maxB = Math.max(...hist.b);
+    const maxRGB = Math.max(...hist.rgb);
+
+    hist.r = hist.r.map((v) => v / maxR);
+    hist.g = hist.g.map((v) => v / maxG);
+    hist.b = hist.b.map((v) => v / maxB);
+    hist.rgb = hist.rgb.map((v) => v / maxRGB);
+
+    this.histogram = hist;
+
+    // Redraw to show histogram
+    this.draw();
+  },
+
+  getMousePos(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
+  },
+
+  canvasToValue(x, y) {
+    const padding = 20;
+    const width = this.canvas.width - padding * 2;
+    const height = this.canvas.height - padding * 2;
+    return {
+      input: Math.round(((x - padding) / width) * 255),
+      output: Math.round(255 - ((y - padding) / height) * 255),
+    };
+  },
+
+  valueToCanvas(input, output) {
+    const padding = 20;
+    const width = this.canvas.width - padding * 2;
+    const height = this.canvas.height - padding * 2;
+    return {
+      x: padding + (input / 255) * width,
+      y: padding + (1 - output / 255) * height,
+    };
+  },
+
+  onMouseDown(e) {
+    const pos = this.getMousePos(e);
+    const curve = this.curves[this.currentChannel];
+
+    // Check if clicking near existing point
+    for (let i = 0; i < curve.length; i++) {
+      const p = this.valueToCanvas(curve[i][0], curve[i][1]);
+      const dist = Math.sqrt((pos.x - p.x) ** 2 + (pos.y - p.y) ** 2);
+      if (dist < 10) {
+        this.draggingPoint = i;
+        return;
+      }
+    }
+
+    // Add new point
+    const value = this.canvasToValue(pos.x, pos.y);
+    if (
+      value.input >= 0 &&
+      value.input <= 255 &&
+      value.output >= 0 &&
+      value.output <= 255
+    ) {
+      curve.push([value.input, value.output]);
+      curve.sort((a, b) => a[0] - b[0]);
+      this.draggingPoint = curve.findIndex(
+        (p) => p[0] === value.input && p[1] === value.output,
+      );
+      this.draw();
+      convertImage(); // Real-time update
+    }
+  },
+
+  onMouseMove(e) {
+    if (this.draggingPoint === null) return;
+
+    const curve = this.curves[this.currentChannel];
+    const pos = this.getMousePos(e);
+    const value = this.canvasToValue(pos.x, pos.y);
+
+    // Clamp values
+    value.input = Math.max(0, Math.min(255, value.input));
+    value.output = Math.max(0, Math.min(255, value.output));
+
+    curve[this.draggingPoint] = [value.input, value.output];
+
+    // Sort to maintain order
+    curve.sort((a, b) => a[0] - b[0]);
+
+    // Update dragging point index after sort
+    this.draggingPoint = curve.findIndex(
+      (p) => p[0] === value.input && p[1] === value.output,
+    );
+
+    this.draw();
+    convertImage(); // Real-time update
+  },
+
+  onMouseUp() {
+    this.draggingPoint = null;
+  },
+
+  onDoubleClick(e) {
+    const pos = this.getMousePos(e);
+    const curve = this.curves[this.currentChannel];
+
+    // Check if clicking near existing point (not first or last)
+    for (let i = 1; i < curve.length - 1; i++) {
+      const p = this.valueToCanvas(curve[i][0], curve[i][1]);
+      const dist = Math.sqrt((pos.x - p.x) ** 2 + (pos.y - p.y) ** 2);
+      if (dist < 10) {
+        curve.splice(i, 1);
+        this.draw();
+        convertImage(); // Real-time update
+        return;
+      }
+    }
+  },
+
+  interpolateCurve(curve) {
+    const lut = new Array(256);
+
+    // Get the actual input range from the curve endpoints
+    const startInput = curve[0][0];
+    const endInput = curve[curve.length - 1][0];
+
+    // Calculate tangents using finite differences with smoothing
+    const tangents = [];
+    for (let i = 0; i < curve.length; i++) {
+      if (curve.length === 2) {
+        // For 2 points, tangents match the line slope
+        const dx = curve[1][0] - curve[0][0];
+        const dy = curve[1][1] - curve[0][1];
+        tangents.push(dx === 0 ? 0 : dy / dx);
+      } else if (i === 0) {
+        // First point: use slope to next point
+        const dx = curve[1][0] - curve[0][0];
+        const dy = curve[1][1] - curve[0][1];
+        tangents.push(dx === 0 ? 0 : dy / dx);
+      } else if (i === curve.length - 1) {
+        // Last point: use slope from previous point
+        const dx = curve[i][0] - curve[i - 1][0];
+        const dy = curve[i][1] - curve[i - 1][1];
+        tangents.push(dx === 0 ? 0 : dy / dx);
+      } else {
+        // Interior points: use finite difference method
+        const prev = curve[i - 1];
+        const curr = curve[i];
+        const next = curve[i + 1];
+
+        // Calculate secant slopes
+        const dx_prev = curr[0] - prev[0];
+        const dy_prev = curr[1] - prev[1];
+        const dx_next = next[0] - curr[0];
+        const dy_next = next[1] - curr[1];
+
+        const m_prev = dx_prev === 0 ? 0 : dy_prev / dx_prev;
+        const m_next = dx_next === 0 ? 0 : dy_next / dx_next;
+
+        // Use weighted average for smooth tangent
+        const w_prev = dx_next;
+        const w_next = dx_prev;
+        const w_total = w_prev + w_next;
+
+        if (w_total === 0) {
+          tangents.push(0);
+        } else {
+          const m = (w_prev * m_prev + w_next * m_next) / w_total;
+
+          // Apply monotonicity constraint
+          if (m_prev * m_next <= 0) {
+            tangents.push(0);
+          } else {
+            // Limit tangent to prevent overshooting beyond [0, 255]
+            const alpha = m / m_prev;
+            const beta = m / m_next;
+
+            if (alpha < 0 || beta < 0) {
+              tangents.push(0);
+            } else if (alpha * alpha + beta * beta > 9) {
+              const tau = 3 / Math.sqrt(alpha * alpha + beta * beta);
+              tangents.push(tau * m);
+            } else {
+              tangents.push(m);
+            }
+          }
+        }
+      }
+    }
+
+    // Adjust tangents to prevent curve from going out of bounds [0, 255]
+    for (let i = 0; i < curve.length - 1; i++) {
+      const p0 = curve[i];
+      const p1 = curve[i + 1];
+      const m0 = tangents[i];
+      const m1 = tangents[i + 1];
+      const dx = p1[0] - p0[0];
+
+      if (dx > 0) {
+        // Check if curve would exceed bounds and reduce tangents if needed
+        const samples = 10;
+        for (let s = 0; s <= samples; s++) {
+          const t = s / samples;
+          const t2 = t * t;
+          const t3 = t2 * t;
+
+          const h00 = 2 * t3 - 3 * t2 + 1;
+          const h10 = t3 - 2 * t2 + t;
+          const h01 = -2 * t3 + 3 * t2;
+          const h11 = t3 - t2;
+
+          const y = h00 * p0[1] + h10 * dx * m0 + h01 * p1[1] + h11 * dx * m1;
+
+          // If curve overshoots, scale down tangents
+          if (y < 0 || y > 255) {
+            const scale = 0.5;
+            tangents[i] *= scale;
+            tangents[i + 1] *= scale;
+            i--; // Recheck this segment
+            break;
+          }
+        }
+      }
+    }
+
+    for (let i = 0; i < 256; i++) {
+      // Handle values before the first point (black point)
+      if (i < startInput) {
+        lut[i] = curve[0][1];
+        continue;
+      }
+
+      // Handle values after the last point (white point)
+      if (i > endInput) {
+        lut[i] = curve[curve.length - 1][1];
+        continue;
+      }
+
+      // Find the segment this input falls into
+      let segmentIdx = 0;
+      for (let j = 0; j < curve.length - 1; j++) {
+        if (curve[j][0] <= i && curve[j + 1][0] >= i) {
+          segmentIdx = j;
+          break;
+        }
+      }
+
+      const p0 = curve[segmentIdx];
+      const p1 = curve[segmentIdx + 1];
+      const m0 = tangents[segmentIdx];
+      const m1 = tangents[segmentIdx + 1];
+
+      const dx = p1[0] - p0[0];
+
+      if (dx === 0) {
+        lut[i] = p0[1];
+      } else if (curve.length === 2) {
+        // Linear interpolation for just 2 points
+        const t = (i - p0[0]) / dx;
+        lut[i] = Math.round(p0[1] + t * (p1[1] - p0[1]));
+      } else {
+        // Cubic Hermite interpolation for smooth curves
+        const t = (i - p0[0]) / dx;
+        const t2 = t * t;
+        const t3 = t2 * t;
+
+        const h00 = 2 * t3 - 3 * t2 + 1;
+        const h10 = t3 - 2 * t2 + t;
+        const h01 = -2 * t3 + 3 * t2;
+        const h11 = t3 - t2;
+
+        lut[i] = Math.round(
+          h00 * p0[1] + h10 * dx * m0 + h01 * p1[1] + h11 * dx * m1,
+        );
+      }
+
+      lut[i] = Math.max(0, Math.min(255, lut[i]));
+    }
+
+    return lut;
+  },
+
+  draw() {
+    const ctx = this.ctx;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    const padding = 20;
+    const graphWidth = width - padding * 2;
+    const graphHeight = height - padding * 2;
+
+    // Clear
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw histogram if available
+    if (this.histogram) {
+      const hist = this.histogram[this.currentChannel];
+      ctx.globalAlpha = 0.3;
+
+      if (this.currentChannel === "rgb") {
+        ctx.fillStyle = "#ffffff";
+      } else if (this.currentChannel === "red") {
+        ctx.fillStyle = "#ff4a4a";
+      } else if (this.currentChannel === "green") {
+        ctx.fillStyle = "#4aff4a";
+      } else {
+        ctx.fillStyle = "#4a9eff";
+      }
+
+      for (let i = 0; i < 256; i++) {
+        const x = padding + (i / 255) * graphWidth;
+        const h = hist[i] * graphHeight * 0.8;
+        ctx.fillRect(x, padding + graphHeight - h, graphWidth / 256, h);
+      }
+
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw grid
+    ctx.strokeStyle = "#2a2a2a";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const x = padding + (i / 4) * graphWidth;
+      const y = padding + (i / 4) * graphHeight;
+      ctx.beginPath();
+      ctx.moveTo(x, padding);
+      ctx.lineTo(x, padding + graphHeight);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(padding + graphWidth, y);
+      ctx.stroke();
+    }
+
+    // Draw diagonal reference line
+    ctx.strokeStyle = "#404040";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(padding, padding + graphHeight);
+    ctx.lineTo(padding + graphWidth, padding);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw curve
+    const curve = this.curves[this.currentChannel];
+    const lut = this.interpolateCurve(curve);
+
+    if (this.currentChannel === "rgb") {
+      ctx.strokeStyle = "#ffffff";
+    } else if (this.currentChannel === "red") {
+      ctx.strokeStyle = "#ff4a4a";
+    } else if (this.currentChannel === "green") {
+      ctx.strokeStyle = "#4aff4a";
+    } else {
+      ctx.strokeStyle = "#4a9eff";
+    }
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 256; i++) {
+      const pos = this.valueToCanvas(i, lut[i]);
+      if (i === 0) {
+        ctx.moveTo(pos.x, pos.y);
+      } else {
+        ctx.lineTo(pos.x, pos.y);
+      }
+    }
+    ctx.stroke();
+
+    // Draw control points
+    ctx.fillStyle = "#ffffff";
+    for (const point of curve) {
+      const pos = this.valueToCanvas(point[0], point[1]);
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#1a1a1a";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  },
+
+  applyCurves(imageData) {
+    const data = imageData.data;
+    const rgbLut = this.interpolateCurve(this.curves.rgb);
+    const redLut = this.interpolateCurve(this.curves.red);
+    const greenLut = this.interpolateCurve(this.curves.green);
+    const blueLut = this.interpolateCurve(this.curves.blue);
+
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = redLut[rgbLut[data[i]]];
+      data[i + 1] = greenLut[rgbLut[data[i + 1]]];
+      data[i + 2] = blueLut[rgbLut[data[i + 2]]];
+    }
+
+    return imageData;
+  },
+};
+
+// Quantize to 4-bit per channel (12-bit color)
+function quantize4bit(value) {
+  return Math.floor(value / 17) * 17;
+}
+
+// Apply image adjustments
+function applyAdjustments(imageData, brightness, contrast, saturation, gamma) {
+  // Apply curves first if any are modified
+  const hasCurves = Object.entries(curvesEditor.curves).some(
+    ([channel, curve]) => {
+      // Check if curve has more than 2 points
+      if (curve.length > 2) return true;
+      // Check if the endpoints have been moved from default [0,0] and [255,255]
+      if (curve.length === 2) {
+        return (
+          curve[0][0] !== 0 ||
+          curve[0][1] !== 0 ||
+          curve[1][0] !== 255 ||
+          curve[1][1] !== 255
+        );
+      }
+      return false;
+    },
+  );
+
+  if (hasCurves) {
+    imageData = curvesEditor.applyCurves(imageData);
+  }
+
+  const data = imageData.data;
+  const contrastFactor = (contrast + 100) / 100;
+  const brightnessFactor = brightness / 100;
+  const saturationFactor = (saturation + 100) / 100;
+
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+
+    // Brightness
+    r += brightnessFactor * 255;
+    g += brightnessFactor * 255;
+    b += brightnessFactor * 255;
+
+    // Contrast
+    r = ((r / 255 - 0.5) * contrastFactor + 0.5) * 255;
+    g = ((g / 255 - 0.5) * contrastFactor + 0.5) * 255;
+    b = ((b / 255 - 0.5) * contrastFactor + 0.5) * 255;
+
+    // Saturation
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    r = gray + (r - gray) * saturationFactor;
+    g = gray + (g - gray) * saturationFactor;
+    b = gray + (b - gray) * saturationFactor;
+
+    // Gamma
+    r = Math.pow(r / 255, 1 / gamma) * 255;
+    g = Math.pow(g / 255, 1 / gamma) * 255;
+    b = Math.pow(b / 255, 1 / gamma) * 255;
+
+    // Clamp
+    data[i] = Math.max(0, Math.min(255, r));
+    data[i + 1] = Math.max(0, Math.min(255, g));
+    data[i + 2] = Math.max(0, Math.min(255, b));
+  }
+
+  return imageData;
+}
+
+// Median Cut quantization
+function medianCut(pixels, colorCount) {
+  // Start with all pixels in one box
+  let boxes = [{ pixels: pixels }];
+
+  // Keep splitting until we have enough boxes
+  while (boxes.length < colorCount) {
+    // Find the box with the largest volume
+    let maxVolume = -1;
+    let maxIdx = 0;
+
+    for (let i = 0; i < boxes.length; i++) {
+      const box = boxes[i];
+      if (box.pixels.length <= 1) continue;
+
+      let rMin = 255,
+        rMax = 0;
+      let gMin = 255,
+        gMax = 0;
+      let bMin = 255,
+        bMax = 0;
+
+      for (const pixel of box.pixels) {
+        rMin = Math.min(rMin, pixel.r);
+        rMax = Math.max(rMax, pixel.r);
+        gMin = Math.min(gMin, pixel.g);
+        gMax = Math.max(gMax, pixel.g);
+        bMin = Math.min(bMin, pixel.b);
+        bMax = Math.max(bMax, pixel.b);
+      }
+
+      const volume = (rMax - rMin) * (gMax - gMin) * (bMax - bMin);
+      if (volume > maxVolume) {
+        maxVolume = volume;
+        maxIdx = i;
+      }
+    }
+
+    // If no box can be split, break
+    if (maxVolume === -1 || boxes[maxIdx].pixels.length <= 1) {
+      break;
+    }
+
+    // Split the box with largest volume
+    const boxToSplit = boxes[maxIdx];
+    const pixels = boxToSplit.pixels;
+
+    // Find the channel with the greatest range
+    let rMin = 255,
+      rMax = 0;
+    let gMin = 255,
+      gMax = 0;
+    let bMin = 255,
+      bMax = 0;
+
+    for (const pixel of pixels) {
+      rMin = Math.min(rMin, pixel.r);
+      rMax = Math.max(rMax, pixel.r);
+      gMin = Math.min(gMin, pixel.g);
+      gMax = Math.max(gMax, pixel.g);
+      bMin = Math.min(bMin, pixel.b);
+      bMax = Math.max(bMax, pixel.b);
+    }
+
+    const rRange = rMax - rMin;
+    const gRange = gMax - gMin;
+    const bRange = bMax - bMin;
+
+    // Sort by the channel with greatest range
+    if (rRange >= gRange && rRange >= bRange) {
+      pixels.sort((a, b) => a.r - b.r);
+    } else if (gRange >= bRange) {
+      pixels.sort((a, b) => a.g - b.g);
+    } else {
+      pixels.sort((a, b) => a.b - b.b);
+    }
+
+    // Split in half
+    const mid = Math.floor(pixels.length / 2);
+    const left = pixels.slice(0, mid);
+    const right = pixels.slice(mid);
+
+    // Replace the box with two new boxes
+    boxes.splice(maxIdx, 1, { pixels: left }, { pixels: right });
+  }
+
+  // Calculate average color for each box
+  const palette = [];
+  for (const box of boxes) {
+    let r = 0,
+      g = 0,
+      b = 0;
+    for (const pixel of box.pixels) {
+      r += pixel.r;
+      g += pixel.g;
+      b += pixel.b;
+    }
+    const count = box.pixels.length;
+    palette.push({
+      r: quantize4bit(Math.round(r / count)),
+      g: quantize4bit(Math.round(g / count)),
+      b: quantize4bit(Math.round(b / count)),
+    });
+  }
+
+  return palette;
+}
+
+// Wu quantization (simplified - uses median cut)
+function wuQuantization(imageData, colorCount) {
+  const data = imageData.data;
+  const pixels = [];
+
+  // Sample pixels (use all for small images, sample for large)
+  const step = Math.max(1, Math.floor(data.length / (4 * 10000)));
+  for (let i = 0; i < data.length; i += 4 * step) {
+    pixels.push({
+      r: quantize4bit(data[i]),
+      g: quantize4bit(data[i + 1]),
+      b: quantize4bit(data[i + 2]),
+    });
+  }
+
+  return medianCut(pixels, colorCount);
+}
+
+// RGB Quant (popularity + spatial distribution)
+function rgbQuantization(imageData, colorCount) {
+  const data = imageData.data;
+  const colorMap = new Map();
+
+  // Count color frequencies
+  for (let i = 0; i < data.length; i += 4) {
+    const r = quantize4bit(data[i]);
+    const g = quantize4bit(data[i + 1]);
+    const b = quantize4bit(data[i + 2]);
+    const key = `${r},${g},${b}`;
+    colorMap.set(key, (colorMap.get(key) || 0) + 1);
+  }
+
+  // Get all unique colors with their counts
+  const colors = Array.from(colorMap.entries()).map(([key, count]) => {
+    const [r, g, b] = key.split(",").map(Number);
+    return { r, g, b, count };
+  });
+
+  // If we have fewer unique colors than requested, return all
+  if (colors.length <= colorCount) {
+    return colors;
+  }
+
+  // Sort by popularity
+  colors.sort((a, b) => b.count - a.count);
+
+  // Start with most popular color
+  const palette = [colors[0]];
+
+  // Iteratively add colors that maximize distance * popularity
+  while (palette.length < colorCount) {
+    let bestCandidate = null;
+    let bestScore = -1;
+
+    for (const candidate of colors) {
+      // Skip if already in palette
+      if (
+        palette.some(
+          (p) =>
+            p.r === candidate.r && p.g === candidate.g && p.b === candidate.b,
+        )
+      ) {
+        continue;
+      }
+
+      // Calculate minimum distance to existing palette
+      let minDist = Infinity;
+      for (const existing of palette) {
+        const dr = candidate.r - existing.r;
+        const dg = candidate.g - existing.g;
+        const db = candidate.b - existing.b;
+        const dist = dr * dr + dg * dg + db * db;
+        minDist = Math.min(minDist, dist);
+      }
+
+      // Weight by both popularity and distance
+      const score = Math.sqrt(candidate.count) * Math.sqrt(minDist);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCandidate = candidate;
+      }
+    }
+
+    if (bestCandidate) {
+      palette.push(bestCandidate);
+    } else {
+      break;
+    }
+  }
+
+  return palette;
+}
+
+// Seeded random number generator for deterministic results
+function seededRandom(seed) {
+  let state = seed;
+  return function () {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0xffffffff;
+  };
+}
+
+// NeuQuant (simplified - k-means clustering)
+function neuQuantization(imageData, colorCount) {
+  const data = imageData.data;
+  const pixels = [];
+
+  // Sample pixels
+  const step = Math.max(1, Math.floor(data.length / (4 * 5000)));
+  for (let i = 0; i < data.length; i += 4 * step) {
+    pixels.push({
+      r: data[i],
+      g: data[i + 1],
+      b: data[i + 2],
+    });
+  }
+
+  if (pixels.length === 0) {
+    return [];
+  }
+
+  // Create deterministic random using image data as seed
+  let seed = 0;
+  for (let i = 0; i < Math.min(data.length, 100); i++) {
+    seed = ((seed << 5) - seed + data[i]) >>> 0;
+  }
+  const random = seededRandom(seed);
+
+  // Initialize centroids using k-means++ for better distribution
+  const centroids = [];
+
+  // First centroid is random
+  centroids.push({
+    ...pixels[Math.floor(random() * pixels.length)],
+  });
+
+  // Remaining centroids using k-means++ algorithm
+  while (centroids.length < colorCount) {
+    // Calculate distance from each pixel to nearest existing centroid
+    const distances = pixels.map((pixel) => {
+      let minDist = Infinity;
+      for (const centroid of centroids) {
+        const dr = pixel.r - centroid.r;
+        const dg = pixel.g - centroid.g;
+        const db = pixel.b - centroid.b;
+        const dist = dr * dr + dg * dg + db * db;
+        minDist = Math.min(minDist, dist);
+      }
+      return minDist;
+    });
+
+    // Pick new centroid with probability proportional to distance squared
+    const totalDist = distances.reduce((a, b) => a + b, 0);
+    let rand = random() * totalDist;
+    let idx = 0;
+
+    for (let i = 0; i < distances.length; i++) {
+      rand -= distances[i];
+      if (rand <= 0) {
+        idx = i;
+        break;
+      }
+    }
+
+    centroids.push({ ...pixels[idx] });
+  }
+
+  // K-means iterations
+  for (let iter = 0; iter < 15; iter++) {
+    // Assign pixels to nearest centroid
+    const clusters = Array(colorCount)
+      .fill(null)
+      .map(() => []);
+
+    for (const pixel of pixels) {
+      let minDist = Infinity;
+      let bestIdx = 0;
+
+      for (let i = 0; i < centroids.length; i++) {
+        const dr = pixel.r - centroids[i].r;
+        const dg = pixel.g - centroids[i].g;
+        const db = pixel.b - centroids[i].b;
+        const dist = dr * dr + dg * dg + db * db;
+
+        if (dist < minDist) {
+          minDist = dist;
+          bestIdx = i;
+        }
+      }
+
+      clusters[bestIdx].push(pixel);
+    }
+
+    // Update centroids
+    let changed = false;
+    for (let i = 0; i < centroids.length; i++) {
+      if (clusters[i].length > 0) {
+        let r = 0,
+          g = 0,
+          b = 0;
+        for (const pixel of clusters[i]) {
+          r += pixel.r;
+          g += pixel.g;
+          b += pixel.b;
+        }
+        const count = clusters[i].length;
+        const newR = r / count;
+        const newG = g / count;
+        const newB = b / count;
+
+        // Check if centroid moved significantly
+        if (
+          Math.abs(newR - centroids[i].r) > 0.5 ||
+          Math.abs(newG - centroids[i].g) > 0.5 ||
+          Math.abs(newB - centroids[i].b) > 0.5
+        ) {
+          changed = true;
+        }
+
+        centroids[i] = { r: newR, g: newG, b: newB };
+      }
+    }
+
+    // Early exit if converged
+    if (!changed) break;
+  }
+
+  // Quantize centroids to 12-bit
+  return centroids.map((c) => ({
+    r: quantize4bit(Math.round(c.r)),
+    g: quantize4bit(Math.round(c.g)),
+    b: quantize4bit(Math.round(c.b)),
+  }));
+}
+
+// Main palette building function
+function buildPalette(imageData, colorCount, method) {
+  let palette;
+
+  // Start with locked colors
+  const lockedPalette = Array.from(lockedColors).map((hex) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return {
+      r: quantize4bit(r),
+      g: quantize4bit(g),
+      b: quantize4bit(b),
+    };
+  });
+
+  const remainingColors = colorCount - lockedPalette.length;
+
+  if (remainingColors <= 0) {
+    // Only use locked colors if we have enough
+    return lockedPalette.slice(0, colorCount);
+  }
+
+  // Generate palette for remaining slots
+  switch (method) {
+    case "median-cut":
+      palette = wuQuantization(imageData, remainingColors);
+      break;
+    case "wuquant":
+      palette = wuQuantization(imageData, remainingColors);
+      break;
+    case "neuquant":
+      palette = neuQuantization(imageData, remainingColors);
+      break;
+    case "rgbquant":
+    default:
+      palette = rgbQuantization(imageData, remainingColors);
+      break;
+  }
+
+  // Combine locked and generated colors
+  const combinedPalette = [...lockedPalette, ...palette];
+
+  // Remove duplicates that might result from 12-bit quantization
+  const seen = new Set();
+  const uniquePalette = [];
+  for (const color of combinedPalette) {
+    const key = `${color.r},${color.g},${color.b}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniquePalette.push(color);
+    }
+  }
+
+  // If we lost colors due to deduplication, use median cut to fill gaps
+  if (
+    uniquePalette.length < colorCount &&
+    uniquePalette.length < combinedPalette.length
+  ) {
+    // Get all unique 12-bit colors from image
+    const data = imageData.data;
+    const imageColors = new Set();
+    for (let i = 0; i < data.length; i += 4) {
+      const r = quantize4bit(data[i]);
+      const g = quantize4bit(data[i + 1]);
+      const b = quantize4bit(data[i + 2]);
+      const key = `${r},${g},${b}`;
+      if (!seen.has(key)) {
+        imageColors.add(key);
+      }
+    }
+
+    // Add most different colors from the image
+    const candidates = Array.from(imageColors).map((key) => {
+      const [r, g, b] = key.split(",").map(Number);
+      return { r, g, b };
+    });
+
+    while (uniquePalette.length < colorCount && candidates.length > 0) {
+      // Find candidate most distant from current palette
+      let maxMinDist = -1;
+      let bestIdx = 0;
+
+      for (let i = 0; i < candidates.length; i++) {
+        const candidate = candidates[i];
+        let minDist = Infinity;
+
+        for (const existing of uniquePalette) {
+          const dr = candidate.r - existing.r;
+          const dg = candidate.g - existing.g;
+          const db = candidate.b - existing.b;
+          const dist = dr * dr + dg * dg + db * db;
+          minDist = Math.min(minDist, dist);
+        }
+
+        if (minDist > maxMinDist) {
+          maxMinDist = minDist;
+          bestIdx = i;
+        }
+      }
+
+      uniquePalette.push(candidates[bestIdx]);
+      candidates.splice(bestIdx, 1);
+    }
+  }
+
+  return uniquePalette;
+}
+
+// Find nearest color in palette
+function findNearestColor(r, g, b, palette) {
+  let minDist = Infinity;
+  let bestColor = palette[0];
+
+  for (const color of palette) {
+    const dr = r - color.r;
+    const dg = g - color.g;
+    const db = b - color.b;
+    const dist = dr * dr + dg * dg + db * db;
+
+    if (dist < minDist) {
+      minDist = dist;
+      bestColor = color;
+    }
+  }
+
+  return bestColor;
+}
+
+// Dithering algorithms
+function applyDithering(imageData, palette, method, amount, bayerSize) {
+  const width = imageData.width;
+  const height = imageData.height;
+  const data = new Int16Array(imageData.data);
+
+  if (method === "none") {
+    for (let i = 0; i < data.length; i += 4) {
+      const color = findNearestColor(
+        data[i],
+        data[i + 1],
+        data[i + 2],
+        palette,
+      );
+      data[i] = color.r;
+      data[i + 1] = color.g;
+      data[i + 2] = color.b;
+    }
+  } else if (method === "floyd-steinberg") {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+
+        const r = Math.max(0, Math.min(255, data[idx]));
+        const g = Math.max(0, Math.min(255, data[idx + 1]));
+        const b = Math.max(0, Math.min(255, data[idx + 2]));
+
+        const color = findNearestColor(r, g, b, palette);
+
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+
+        const errR = (r - color.r) * amount;
+        const errG = (g - color.g) * amount;
+        const errB = (b - color.b) * amount;
+
+        if (x + 1 < width) {
+          data[idx + 4] += (errR * 7) / 16;
+          data[idx + 5] += (errG * 7) / 16;
+          data[idx + 6] += (errB * 7) / 16;
+        }
+        if (y + 1 < height) {
+          if (x > 0) {
+            data[idx - 4 + width * 4] += (errR * 3) / 16;
+            data[idx - 3 + width * 4] += (errG * 3) / 16;
+            data[idx - 2 + width * 4] += (errB * 3) / 16;
+          }
+          data[idx + width * 4] += (errR * 5) / 16;
+          data[idx + 1 + width * 4] += (errG * 5) / 16;
+          data[idx + 2 + width * 4] += (errB * 5) / 16;
+          if (x + 1 < width) {
+            data[idx + 4 + width * 4] += (errR * 1) / 16;
+            data[idx + 5 + width * 4] += (errG * 1) / 16;
+            data[idx + 6 + width * 4] += (errB * 1) / 16;
+          }
+        }
+      }
+    }
+  } else if (method === "atkinson") {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+
+        const r = Math.max(0, Math.min(255, data[idx]));
+        const g = Math.max(0, Math.min(255, data[idx + 1]));
+        const b = Math.max(0, Math.min(255, data[idx + 2]));
+
+        const color = findNearestColor(r, g, b, palette);
+
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+
+        const errR = ((r - color.r) / 8) * amount;
+        const errG = ((g - color.g) / 8) * amount;
+        const errB = ((b - color.b) / 8) * amount;
+
+        if (x + 1 < width) {
+          data[idx + 4] += errR;
+          data[idx + 5] += errG;
+          data[idx + 6] += errB;
+        }
+        if (x + 2 < width) {
+          data[idx + 8] += errR;
+          data[idx + 9] += errG;
+          data[idx + 10] += errB;
+        }
+        if (y + 1 < height) {
+          if (x > 0) {
+            data[idx - 4 + width * 4] += errR;
+            data[idx - 3 + width * 4] += errG;
+            data[idx - 2 + width * 4] += errB;
+          }
+          data[idx + width * 4] += errR;
+          data[idx + 1 + width * 4] += errG;
+          data[idx + 2 + width * 4] += errB;
+          if (x + 1 < width) {
+            data[idx + 4 + width * 4] += errR;
+            data[idx + 5 + width * 4] += errG;
+            data[idx + 6 + width * 4] += errB;
+          }
+        }
+        if (y + 2 < height) {
+          data[idx + width * 8] += errR;
+          data[idx + 1 + width * 8] += errG;
+          data[idx + 2 + width * 8] += errB;
+        }
+      }
+    }
+  } else if (method === "ordered") {
+    const bayer2 = [
+      [0, 2],
+      [3, 1],
+    ];
+    const bayer4 = [
+      [0, 8, 2, 10],
+      [12, 4, 14, 6],
+      [3, 11, 1, 9],
+      [15, 7, 13, 5],
+    ];
+    const bayer8 = [
+      [0, 32, 8, 40, 2, 34, 10, 42],
+      [48, 16, 56, 24, 50, 18, 58, 26],
+      [12, 44, 4, 36, 14, 46, 6, 38],
+      [60, 28, 52, 20, 62, 30, 54, 22],
+      [3, 35, 11, 43, 1, 33, 9, 41],
+      [51, 19, 59, 27, 49, 17, 57, 25],
+      [15, 47, 7, 39, 13, 45, 5, 37],
+      [63, 31, 55, 23, 61, 29, 53, 21],
+    ];
+
+    const matrices = { 2: bayer2, 4: bayer4, 8: bayer8 };
+    const matrix = matrices[bayerSize] || bayer8;
+    const matrixMax = bayerSize * bayerSize;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const threshold =
+          (matrix[y % bayerSize][x % bayerSize] / matrixMax - 0.5) *
+          64 *
+          amount;
+
+        const r = Math.max(0, Math.min(255, data[idx] + threshold));
+        const g = Math.max(0, Math.min(255, data[idx + 1] + threshold));
+        const b = Math.max(0, Math.min(255, data[idx + 2] + threshold));
+
+        const color = findNearestColor(r, g, b, palette);
+
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+      }
+    }
+  }
+
+  // Copy back to Uint8ClampedArray
+  for (let i = 0; i < imageData.data.length; i++) {
+    imageData.data[i] = Math.max(0, Math.min(255, data[i]));
+  }
+
+  return imageData;
+}
+
+// Display palette colors
+let lockedColors = new Set();
+let currentPalette = [];
+let currentIndexedData = null; // Store indexed pixel data for indexed PNG export
+let flashInterval = null;
+let flashTimeout = null;
+let originalPreviewData = null;
+
+function displayPalette(palette) {
+  const paletteDisplay = document.getElementById("paletteDisplay");
+  paletteDisplay.innerHTML = "";
+  currentPalette = palette;
+
+  // Reset original preview data for flash effect
+  originalPreviewData = null;
+
+  // Count pixels for each color
+  const previewCanvas = document.getElementById("previewCanvas");
+  const ctx = previewCanvas.getContext("2d");
+  const imageData = ctx.getImageData(
+    0,
+    0,
+    previewCanvas.width,
+    previewCanvas.height,
+  );
+  const data = imageData.data;
+  const pixelCounts = new Array(palette.length).fill(0);
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    // Find which palette color this pixel uses
+    for (let j = 0; j < palette.length; j++) {
+      if (palette[j].r === r && palette[j].g === g && palette[j].b === b) {
+        pixelCounts[j]++;
+        break;
+      }
+    }
+  }
+
+  for (let i = 0; i < palette.length; i++) {
+    const color = palette[i];
+    const colorDiv = document.createElement("div");
+    colorDiv.className = "palette-color";
+    colorDiv.style.backgroundColor = `rgb(${color.r}, ${color.g}, ${color.b})`;
+    colorDiv.dataset.index = i;
+
+    // Convert to hex for internal storage (6-digit)
+    const hexR = color.r.toString(16).padStart(2, "0");
+    const hexG = color.g.toString(16).padStart(2, "0");
+    const hexB = color.b.toString(16).padStart(2, "0");
+    const hexColor = `#${hexR}${hexG}${hexB}`.toUpperCase();
+
+    // Convert to 12-bit format for tooltip
+    const r4bit = Math.floor(color.r / 17).toString(16);
+    const g4bit = Math.floor(color.g / 17).toString(16);
+    const b4bit = Math.floor(color.b / 17).toString(16);
+    const hex12bit = `#${r4bit}${g4bit}${b4bit}`.toUpperCase();
+
+    // Format pixel count with thousands separator
+    const pixelCount = pixelCounts[i].toLocaleString();
+    const tooltipText = `${hex12bit} • ${pixelCount} px`;
+
+    colorDiv.setAttribute("data-rgb", tooltipText);
+    colorDiv.setAttribute("data-rgb-full", hexColor);
+
+    // Check if this color is locked
+    if (lockedColors.has(hexColor)) {
+      colorDiv.classList.add("locked");
+    }
+
+    // Click to lock/unlock
+    colorDiv.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const wasLocked = lockedColors.has(hexColor);
+
+      if (wasLocked) {
+        lockedColors.delete(hexColor);
+        // Reconvert to potentially remove this color
+        if (window.sourceImage) {
+          convertImage();
+        }
+      } else {
+        lockedColors.add(hexColor);
+        // Just update the visual state
+        colorDiv.classList.add("locked");
+      }
+    });
+
+    // Hover to flash pixels of this color
+    colorDiv.addEventListener("mouseenter", () => {
+      // Clear any existing flash
+      if (flashTimeout) clearTimeout(flashTimeout);
+      if (flashInterval) clearInterval(flashInterval);
+
+      // Start flashing after a short delay
+      flashTimeout = setTimeout(() => {
+        const previewCanvas = document.getElementById("previewCanvas");
+        const slidePreviewCanvas =
+          document.getElementById("slidePreviewCanvas");
+        const viewMode = document.getElementById("viewMode").value;
+
+        // Choose the appropriate canvas based on view mode
+        let canvas;
+        if (viewMode === "slide-reveal") {
+          canvas = slidePreviewCanvas;
+        } else {
+          canvas = previewCanvas;
+        }
+
+        const ctx = canvas.getContext("2d");
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Store original data if not already stored
+        if (!originalPreviewData) {
+          originalPreviewData = new Uint8ClampedArray(imageData.data);
+        }
+
+        const data = imageData.data;
+        let flashOn = false;
+
+        // Calculate flash color (lighter or darker)
+        const brightness = (color.r + color.g + color.b) / 3;
+        const shouldLighten = brightness < 200;
+        const flashR = shouldLighten
+          ? Math.min(255, color.r + 80)
+          : Math.max(0, color.r - 80);
+        const flashG = shouldLighten
+          ? Math.min(255, color.g + 80)
+          : Math.max(0, color.g - 80);
+        const flashB = shouldLighten
+          ? Math.min(255, color.b + 80)
+          : Math.max(0, color.b - 80);
+
+        flashInterval = setInterval(() => {
+          flashOn = !flashOn;
+
+          for (let i = 0; i < data.length; i += 4) {
+            // Check if this pixel matches the palette color
+            if (
+              originalPreviewData[i] === color.r &&
+              originalPreviewData[i + 1] === color.g &&
+              originalPreviewData[i + 2] === color.b
+            ) {
+              if (flashOn) {
+                // Flash on: show brightened/darkened color
+                data[i] = flashR;
+                data[i + 1] = flashG;
+                data[i + 2] = flashB;
+              } else {
+                // Flash off: show original color
+                data[i] = color.r;
+                data[i + 1] = color.g;
+                data[i + 2] = color.b;
+              }
+            }
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+        }, 200); // Flash every 200ms
+      }, 300); // 300ms delay before starting
+    });
+
+    colorDiv.addEventListener("mouseleave", () => {
+      // Stop flashing and restore original
+      if (flashTimeout) {
+        clearTimeout(flashTimeout);
+        flashTimeout = null;
+      }
+      if (flashInterval) {
+        clearInterval(flashInterval);
+        flashInterval = null;
+      }
+
+      // Restore original image data
+      if (originalPreviewData) {
+        const previewCanvas = document.getElementById("previewCanvas");
+        const slidePreviewCanvas =
+          document.getElementById("slidePreviewCanvas");
+        const viewMode = document.getElementById("viewMode").value;
+
+        let canvas;
+        if (viewMode === "slide-reveal") {
+          canvas = slidePreviewCanvas;
+        } else {
+          canvas = previewCanvas;
+        }
+
+        const ctx = canvas.getContext("2d");
+        const imageData = ctx.createImageData(canvas.width, canvas.height);
+        imageData.data.set(originalPreviewData);
+        ctx.putImageData(imageData, 0, 0);
+      }
+    });
+
+    paletteDisplay.appendChild(colorDiv);
+  }
+}
+
+// Main conversion function
+async function convertImage() {
+  if (!window.sourceImage) return;
+
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = "Processing...";
+  statusEl.className = "status processing";
+
+  // Show palette actions
+  document.getElementById("paletteActions").classList.remove("hidden");
+
+  // Use setTimeout to allow UI to update
+  setTimeout(() => {
+    try {
+      const originalCanvas = document.getElementById("originalCanvas");
+      const previewCanvas = document.getElementById("previewCanvas");
+      const slideOriginalCanvas = document.getElementById(
+        "slideOriginalCanvas",
+      );
+      const slidePreviewCanvas = document.getElementById("slidePreviewCanvas");
+
+      const ctx = originalCanvas.getContext("2d", {
+        willReadFrequently: true,
+      });
+      const previewCtx = previewCanvas.getContext("2d");
+
+      // Always process at original image size
+      const width = window.sourceImage.width;
+      const height = window.sourceImage.height;
+
+      // Set canvas sizes to original
+      originalCanvas.width = width;
+      originalCanvas.height = height;
+      previewCanvas.width = width;
+      previewCanvas.height = height;
+      slideOriginalCanvas.width = width;
+      slideOriginalCanvas.height = height;
+      slidePreviewCanvas.width = width;
+      slidePreviewCanvas.height = height;
+
+      // Draw original to main canvas
+      ctx.drawImage(window.sourceImage, 0, 0, width, height);
+
+      // Get image data and calculate histogram
+      let imageData = ctx.getImageData(0, 0, width, height);
+      curvesEditor.calculateHistogram(imageData);
+
+      const brightness = parseInt(document.getElementById("brightness").value);
+      const contrast = parseInt(document.getElementById("contrast").value);
+      const saturation = parseInt(document.getElementById("saturation").value);
+      const gamma = parseFloat(document.getElementById("gamma").value);
+
+      imageData = applyAdjustments(
+        imageData,
+        brightness,
+        contrast,
+        saturation,
+        gamma,
+      );
+
+      // Build palette
+      const colorCount = parseInt(document.getElementById("colors").value);
+      const quantMethod = document.getElementById("quantMethod").value;
+      const palette = buildPalette(imageData, colorCount, quantMethod);
+
+      // Apply dithering
+      const ditherMethod = document.getElementById("ditherMethod").value;
+      const ditherAmount = parseFloat(
+        document.getElementById("ditherAmount").value,
+      );
+      const bayerSize = parseInt(document.getElementById("bayerSize").value);
+
+      imageData = applyDithering(
+        imageData,
+        palette,
+        ditherMethod,
+        ditherAmount,
+        bayerSize,
+      );
+
+      // Draw results to all canvases
+      previewCtx.putImageData(imageData, 0, 0);
+
+      // Draw to slide reveal canvases
+      const slideOriginalCtx = slideOriginalCanvas.getContext("2d");
+      const slidePreviewCtx = slidePreviewCanvas.getContext("2d");
+      slidePreviewCtx.putImageData(imageData, 0, 0);
+      slideOriginalCtx.drawImage(window.sourceImage, 0, 0, width, height);
+
+      // Display palette
+      displayPalette(palette);
+
+      // Update view mode
+      updateViewMode();
+
+      // Enable download
+      document.getElementById("downloadBtn").disabled = false;
+
+      statusEl.textContent = "Ready";
+      statusEl.className = "status";
+    } catch (error) {
+      statusEl.textContent = "Error: " + error.message;
+      statusEl.className = "status error";
+    }
+  }, 10);
+}
+
+// Update view mode display
+function updateViewMode() {
+  const viewMode = document.getElementById("viewMode").value;
+  const zoomLevel = document.getElementById("zoomLevel").value;
+  const canvasGrid = document.getElementById("canvasGrid");
+  const slideContainer = document.getElementById("slideRevealContainer");
+  const originalWrapper = document.getElementById("originalWrapper");
+  const previewWrapper = document.getElementById("previewWrapper");
+
+  // Hide everything first
+  canvasGrid.style.display = "none";
+  slideContainer.style.display = "none";
+  originalWrapper.classList.remove("hidden");
+  previewWrapper.classList.remove("hidden");
+
+  // Apply zoom to all canvases
+  const allCanvases = [
+    document.getElementById("originalCanvas"),
+    document.getElementById("previewCanvas"),
+    document.getElementById("slideOriginalCanvas"),
+    document.getElementById("slidePreviewCanvas"),
+  ];
+
+  if (zoomLevel === "fit") {
+    // For fit mode, use responsive CSS approach
+    allCanvases.forEach((canvas) => {
+      if (!canvas) return;
+
+      // Use responsive sizing with constraints
+      canvas.style.width = "100%";
+      canvas.style.height = "auto";
+      canvas.style.maxWidth = "100%";
+      canvas.style.maxHeight = "100%";
+      canvas.style.objectFit = "contain";
+    });
+  } else {
+    allCanvases.forEach((canvas) => {
+      if (!canvas) return;
+
+      const scale = parseFloat(zoomLevel);
+      canvas.style.width = "";
+      canvas.style.height = "";
+      canvas.style.maxWidth = "";
+      canvas.style.maxHeight = "";
+      canvas.style.objectFit = "";
+
+      if (scale === 1) {
+        // For 100%, let browser use natural canvas size
+        canvas.style.width = "";
+        canvas.style.height = "";
+      } else {
+        // For zoom, explicitly set CSS size
+        const cssWidth = canvas.width * scale;
+        const cssHeight = canvas.height * scale;
+        canvas.style.width = cssWidth + "px";
+        canvas.style.height = cssHeight + "px";
+      }
+    });
+  }
+
+  // Show based on mode
+  if (viewMode === "slide-reveal") {
+    slideContainer.style.display = "flex";
+    slideContainer.style.justifyContent = "center";
+    slideContainer.style.alignItems = "flex-start";
+
+    setTimeout(() => {
+      updateSlideDivider(50);
+    }, 100);
+  } else {
+    canvasGrid.style.display = "grid";
+    canvasGrid.className = "canvas-grid " + viewMode;
+
+    if (viewMode === "original-only") {
+      previewWrapper.classList.add("hidden");
+    } else if (viewMode === "preview-only") {
+      originalWrapper.classList.add("hidden");
+    }
+  }
+}
+
+// Slide reveal divider handling
+let isDraggingSlider = false;
+
+function updateSlideDivider(percentage) {
+  const wrapper = document.getElementById("slideRevealWrapper");
+  const divider = document.getElementById("slideDivider");
+  const topCanvas = document.getElementById("slideOriginalCanvas");
+  const bottomCanvas = document.getElementById("slidePreviewCanvas");
+
+  if (!wrapper || !bottomCanvas || bottomCanvas.width === 0) {
+    return;
+  }
+
+  // Use the canvas's actual displayed width (CSS width), not pixel width
+  const width = bottomCanvas.offsetWidth;
+  const position = (percentage / 100) * width;
+
+  divider.style.left = position + "px";
+  topCanvas.style.clipPath = `inset(0 ${100 - percentage}% 0 0)`;
+}
+
+document.getElementById("slideDivider").addEventListener("mousedown", () => {
+  isDraggingSlider = true;
+});
+
+document.addEventListener("mousemove", (e) => {
+  if (!isDraggingSlider) return;
+
+  const wrapper = document.getElementById("slideRevealWrapper");
+  const canvas = document.getElementById("slidePreviewCanvas");
+  const rect = wrapper.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  // Use offsetWidth (displayed width) not canvas.width (pixel width)
+  const percentage = Math.max(0, Math.min(100, (x / canvas.offsetWidth) * 100));
+
+  updateSlideDivider(percentage);
+});
+
+document.addEventListener("mouseup", () => {
+  isDraggingSlider = false;
+});
+
+// Drag and drop
+const canvasDisplay = document.getElementById("canvasDisplay");
+
+canvasDisplay.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  canvasDisplay.classList.add("drop-target");
+});
+
+canvasDisplay.addEventListener("dragleave", () => {
+  canvasDisplay.classList.remove("drop-target");
+});
+
+canvasDisplay.addEventListener("drop", (e) => {
+  e.preventDefault();
+  canvasDisplay.classList.remove("drop-target");
+
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith("image/")) {
+    loadImageFile(file);
+  }
+});
+
+function loadImageFile(file) {
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const img = new Image();
+    img.onload = () => {
+      window.sourceImage = img;
+      document.getElementById("canvasDisplay").classList.add("has-image");
+      document.getElementById("canvasGrid").style.display = "grid";
+      convertImage();
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Event listeners
+document.getElementById("imageInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  loadImageFile(file);
+});
+
+// Show/hide Bayer size control
+document.getElementById("ditherMethod").addEventListener("change", (e) => {
+  const bayerControl = document.getElementById("bayerSizeControl");
+  bayerControl.style.display = e.target.value === "ordered" ? "block" : "none";
+});
+
+// Trigger conversion on any control change
+const controls = [
+  "colors",
+  "quantMethod",
+  "ditherMethod",
+  "ditherAmount",
+  "bayerSize",
+  "brightness",
+  "contrast",
+  "saturation",
+  "gamma",
+];
+controls.forEach((id) => {
+  document.getElementById(id).addEventListener("input", convertImage);
+  document.getElementById(id).addEventListener("change", convertImage);
+});
+
+// View mode and zoom changes
+document.getElementById("viewMode").addEventListener("change", () => {
+  if (window.sourceImage) {
+    updateViewMode();
+  }
+});
+
+document.getElementById("zoomLevel").addEventListener("change", () => {
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
+
+// Handle window resize for fit mode
+let resizeTimeout;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    const zoomLevel = document.getElementById("zoomLevel").value;
+    if (window.sourceImage && zoomLevel === "fit") {
+      updateViewMode();
+    }
+  }, 100); // Debounce resize events
+});
+
+// Create indexed PNG manually
+function createIndexedPNG(width, height, indexedData, palette) {
+  // Helper to create PNG chunks
+  function createChunk(type, data) {
+    const len = data.length;
+    const buf = new Uint8Array(len + 12);
+    const view = new DataView(buf.buffer);
+
+    // Length
+    view.setUint32(0, len);
+
+    // Type
+    for (let i = 0; i < 4; i++) {
+      buf[4 + i] = type.charCodeAt(i);
+    }
+
+    // Data
+    buf.set(data, 8);
+
+    // CRC
+    const crcData = buf.slice(4, 8 + len);
+    const crc = crc32(crcData);
+    view.setUint32(8 + len, crc);
+
+    return buf;
+  }
+
+  // CRC32 calculation
+  function crc32(data) {
+    let crc = -1;
+    for (let i = 0; i < data.length; i++) {
+      crc = crc ^ data[i];
+      for (let j = 0; j < 8; j++) {
+        crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+      }
+    }
+    return crc ^ -1;
+  }
+
+  // PNG signature
+  const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+
+  // IHDR chunk
+  const ihdr = new Uint8Array(13);
+  const ihdrView = new DataView(ihdr.buffer);
+  ihdrView.setUint32(0, width);
+  ihdrView.setUint32(4, height);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 3; // color type 3 = indexed
+  ihdr[10] = 0; // compression
+  ihdr[11] = 0; // filter
+  ihdr[12] = 0; // interlace
+
+  // PLTE chunk
+  const plte = new Uint8Array(palette.length * 3);
+  for (let i = 0; i < palette.length; i++) {
+    plte[i * 3] = palette[i].r;
+    plte[i * 3 + 1] = palette[i].g;
+    plte[i * 3 + 2] = palette[i].b;
+  }
+
+  // IDAT chunk - prepare scanlines with filter byte
+  const scanlineLength = width + 1; // +1 for filter byte
+  const scanlines = new Uint8Array(height * scanlineLength);
+  for (let y = 0; y < height; y++) {
+    scanlines[y * scanlineLength] = 0; // filter type 0 (none)
+    for (let x = 0; x < width; x++) {
+      scanlines[y * scanlineLength + 1 + x] = indexedData[y * width + x];
+    }
+  }
+
+  // Compress with pako
+  const compressed = pako.deflate(scanlines);
+
+  // IEND chunk (empty)
+  const iend = new Uint8Array(0);
+
+  // Combine all chunks
+  const ihdrChunk = createChunk("IHDR", ihdr);
+  const plteChunk = createChunk("PLTE", plte);
+  const idatChunk = createChunk("IDAT", compressed);
+  const iendChunk = createChunk("IEND", iend);
+
+  const totalLength =
+    signature.length +
+    ihdrChunk.length +
+    plteChunk.length +
+    idatChunk.length +
+    iendChunk.length;
+  const png = new Uint8Array(totalLength);
+
+  let offset = 0;
+  png.set(signature, offset);
+  offset += signature.length;
+  png.set(ihdrChunk, offset);
+  offset += ihdrChunk.length;
+  png.set(plteChunk, offset);
+  offset += plteChunk.length;
+  png.set(idatChunk, offset);
+  offset += idatChunk.length;
+  png.set(iendChunk, offset);
+
+  return png;
+}
+
+// Download button
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  // Always export as indexed PNG
+  // Use whichever preview canvas is currently visible/active
+  const previewCanvas = document.getElementById("previewCanvas");
+  const slidePreviewCanvas = document.getElementById("slidePreviewCanvas");
+  const viewMode = document.getElementById("viewMode").value;
+
+  // Choose the appropriate canvas based on view mode
+  let canvas;
+  if (viewMode === "slide-reveal") {
+    canvas = slidePreviewCanvas;
+  } else {
+    canvas = previewCanvas;
+  }
+
+  if (currentPalette.length > 0) {
+    // Create indexed PNG with exact palette
+    const ctx = canvas.getContext("2d");
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    // Create indexed pixel array by mapping each pixel to palette index
+    const indexed = new Uint8Array(canvas.width * canvas.height);
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // Find closest palette color
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let j = 0; j < currentPalette.length; j++) {
+        const dr = r - currentPalette[j].r;
+        const dg = g - currentPalette[j].g;
+        const db = b - currentPalette[j].b;
+        const dist = dr * dr + dg * dg + db * db;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = j;
+        }
+      }
+      indexed[i / 4] = bestIdx;
+    }
+
+    // Create indexed PNG
+    const pngData = createIndexedPNG(
+      canvas.width,
+      canvas.height,
+      indexed,
+      currentPalette,
+    );
+
+    const blob = new Blob([pngData], { type: "image/png" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.download = "amiga-converted-indexed.png";
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  } else {
+    // Fallback to RGB PNG if no palette available
+    const link = document.createElement("a");
+    link.download = "amiga-converted.png";
+    link.href = canvas.toDataURL();
+    link.click();
+  }
+});
+
+// Reset all button
+document.getElementById("resetAllBtn").addEventListener("click", () => {
+  // Reset only adjustment sliders (not curves or conversion options)
+  document.getElementById("brightness").value = 0;
+  document.getElementById("brightnessNumber").value = 0;
+  document.getElementById("contrast").value = 0;
+  document.getElementById("contrastNumber").value = 0;
+  document.getElementById("saturation").value = 0;
+  document.getElementById("saturationNumber").value = 0;
+  document.getElementById("gamma").value = 1;
+  document.getElementById("gammaNumber").value = 1;
+
+  // Trigger conversion if image is loaded
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
+
+// Initialize curves editor
+curvesEditor.init();
+
+// Collapsible sections
+document.querySelectorAll(".control-group h3").forEach((h3) => {
+  h3.addEventListener("click", () => {
+    const group = h3.parentElement;
+    const content = group.querySelector(".control-group-content");
+
+    if (group.classList.contains("collapsed")) {
+      group.classList.remove("collapsed");
+      content.style.maxHeight = content.scrollHeight + "px";
+    } else {
+      group.classList.add("collapsed");
+      content.style.maxHeight = "0";
+    }
+  });
+
+  // Set initial max-height
+  const group = h3.parentElement;
+  const content = group.querySelector(".control-group-content");
+  if (content && !group.classList.contains("collapsed")) {
+    content.style.maxHeight = content.scrollHeight + "px";
+  }
+});
+
+// Sync slider and number inputs
+function setupSliderNumberSync(sliderId, numberId) {
+  const slider = document.getElementById(sliderId);
+  const number = document.getElementById(numberId);
+
+  if (!slider || !number) return;
+
+  const min = parseFloat(slider.min);
+  const max = parseFloat(slider.max);
+
+  slider.addEventListener("input", () => {
+    number.value = slider.value;
+    number.style.borderColor = ""; // Clear any error state
+  });
+
+  // Allow typing but don't update slider until valid
+  number.addEventListener("input", () => {
+    const value = parseFloat(number.value);
+
+    if (isNaN(value) || value < min || value > max) {
+      // Invalid value - show visual feedback but allow typing
+      number.style.borderColor = "#ff4a4a";
+    } else {
+      // Valid value - update slider and trigger conversion
+      number.style.borderColor = "";
+      slider.value = number.value;
+      slider.dispatchEvent(new Event("input"));
+    }
+  });
+
+  // On blur, enforce valid value
+  number.addEventListener("blur", () => {
+    const value = parseFloat(number.value);
+
+    if (isNaN(value) || value < min || value > max) {
+      // Reset to slider value if invalid
+      number.value = slider.value;
+      number.style.borderColor = "";
+    }
+  });
+}
+
+setupSliderNumberSync("brightness", "brightnessNumber");
+setupSliderNumberSync("contrast", "contrastNumber");
+setupSliderNumberSync("saturation", "saturationNumber");
+setupSliderNumberSync("gamma", "gammaNumber");
+setupSliderNumberSync("colors", "colorsNumber");
+setupSliderNumberSync("ditherAmount", "ditherAmountNumber");
+
+// Track mouse on preview canvas to highlight palette color
+document.getElementById("previewCanvas").addEventListener("mousemove", (e) => {
+  const canvas = document.getElementById("previewCanvas");
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) * (canvas.width / rect.width));
+  const y = Math.floor((e.clientY - rect.top) * (canvas.height / rect.height));
+
+  const ctx = canvas.getContext("2d");
+  const pixel = ctx.getImageData(x, y, 1, 1).data;
+
+  // Convert to 12-bit format for comparison
+  const r4bit = Math.floor(pixel[0] / 17).toString(16);
+  const g4bit = Math.floor(pixel[1] / 17).toString(16);
+  const b4bit = Math.floor(pixel[2] / 17).toString(16);
+  const pixelColor12bit = `#${r4bit}${g4bit}${b4bit}`.toUpperCase();
+
+  // Find matching palette color
+  document.querySelectorAll(".palette-color").forEach((el) => {
+    if (el.dataset.rgb === pixelColor12bit) {
+      el.classList.add("highlighted");
+    } else {
+      el.classList.remove("highlighted");
+    }
+  });
+});
+
+document.getElementById("previewCanvas").addEventListener("mouseleave", () => {
+  document.querySelectorAll(".palette-color").forEach((el) => {
+    el.classList.remove("highlighted");
+  });
+});
+
+// Click preview canvas to lock color
+document.getElementById("previewCanvas").addEventListener("click", (e) => {
+  const canvas = document.getElementById("previewCanvas");
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) * (canvas.width / rect.width));
+  const y = Math.floor((e.clientY - rect.top) * (canvas.height / rect.height));
+
+  const ctx = canvas.getContext("2d");
+  const pixel = ctx.getImageData(x, y, 1, 1).data;
+
+  // Convert to full hex format for locking
+  const hexR = pixel[0].toString(16).padStart(2, "0");
+  const hexG = pixel[1].toString(16).padStart(2, "0");
+  const hexB = pixel[2].toString(16).padStart(2, "0");
+  const hexColor = `#${hexR}${hexG}${hexB}`.toUpperCase();
+
+  // Lock/unlock the color
+  if (lockedColors.has(hexColor)) {
+    lockedColors.delete(hexColor);
+    if (window.sourceImage) {
+      convertImage();
+    }
+  } else {
+    lockedColors.add(hexColor);
+    // Update palette display to show locked state
+    document.querySelectorAll(".palette-color").forEach((el) => {
+      if (el.dataset.rgbFull === hexColor) {
+        el.classList.add("locked");
+      }
+    });
+  }
+});
+
+// Click original canvas to add/remove custom color
+document.getElementById("originalCanvas").addEventListener("click", (e) => {
+  const originalCanvas = document.getElementById("originalCanvas");
+  const rect = originalCanvas.getBoundingClientRect();
+  const x = Math.floor(
+    (e.clientX - rect.left) * (originalCanvas.width / rect.width),
+  );
+  const y = Math.floor(
+    (e.clientY - rect.top) * (originalCanvas.height / rect.height),
+  );
+
+  // Get the color from the original canvas
+  const ctx = originalCanvas.getContext("2d");
+  const pixel = ctx.getImageData(x, y, 1, 1).data;
+
+  // Apply curves adjustments to get the adjusted color
+  let r = pixel[0];
+  let g = pixel[1];
+  let b = pixel[2];
+
+  // Apply curves if available
+  if (typeof curvesEditor !== "undefined" && curvesEditor.applyToPixel) {
+    const adjusted = curvesEditor.applyToPixel(r, g, b);
+    r = adjusted.r;
+    g = adjusted.g;
+    b = adjusted.b;
+  }
+
+  // Apply brightness/contrast/saturation/gamma adjustments
+  const brightness = parseInt(document.getElementById("brightness").value);
+  const contrast = parseInt(document.getElementById("contrast").value);
+  const saturation = parseInt(document.getElementById("saturation").value);
+  const gamma = parseFloat(document.getElementById("gamma").value);
+
+  // Apply brightness
+  r += brightness;
+  g += brightness;
+  b += brightness;
+
+  // Apply contrast
+  const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+  r = contrastFactor * (r - 128) + 128;
+  g = contrastFactor * (g - 128) + 128;
+  b = contrastFactor * (b - 128) + 128;
+
+  // Apply saturation
+  const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+  const satFactor = 1 + saturation / 100;
+  r = gray + (r - gray) * satFactor;
+  g = gray + (g - gray) * satFactor;
+  b = gray + (b - gray) * satFactor;
+
+  // Apply gamma
+  r = 255 * Math.pow(r / 255, 1 / gamma);
+  g = 255 * Math.pow(g / 255, 1 / gamma);
+  b = 255 * Math.pow(b / 255, 1 / gamma);
+
+  // Clamp to valid range
+  r = Math.max(0, Math.min(255, Math.round(r)));
+  g = Math.max(0, Math.min(255, Math.round(g)));
+  b = Math.max(0, Math.min(255, Math.round(b)));
+
+  // Convert to 12-bit color (4 bits per channel)
+  const r12bit = Math.round(r / 17) * 17;
+  const g12bit = Math.round(g / 17) * 17;
+  const b12bit = Math.round(b / 17) * 17;
+
+  // Convert to full hex format
+  const hexR = r12bit.toString(16).padStart(2, "0");
+  const hexG = g12bit.toString(16).padStart(2, "0");
+  const hexB = b12bit.toString(16).padStart(2, "0");
+  const hexColor = `#${hexR}${hexG}${hexB}`.toUpperCase();
+
+  // Toggle locked state
+  if (lockedColors.has(hexColor)) {
+    lockedColors.delete(hexColor);
+  } else {
+    lockedColors.add(hexColor);
+  }
+
+  // Reconvert to apply changes
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
+
+// Click slide preview canvas to lock color
+document.getElementById("slidePreviewCanvas").addEventListener("click", (e) => {
+  const canvas = document.getElementById("slidePreviewCanvas");
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) * (canvas.width / rect.width));
+  const y = Math.floor((e.clientY - rect.top) * (canvas.height / rect.height));
+
+  const ctx = canvas.getContext("2d");
+  const pixel = ctx.getImageData(x, y, 1, 1).data;
+
+  // Convert to full hex format for locking
+  const hexR = pixel[0].toString(16).padStart(2, "0");
+  const hexG = pixel[1].toString(16).padStart(2, "0");
+  const hexB = pixel[2].toString(16).padStart(2, "0");
+  const hexColor = `#${hexR}${hexG}${hexB}`.toUpperCase();
+
+  // Lock/unlock the color
+  if (lockedColors.has(hexColor)) {
+    lockedColors.delete(hexColor);
+    if (window.sourceImage) {
+      convertImage();
+    }
+  } else {
+    lockedColors.add(hexColor);
+    // Update palette display to show locked state
+    document.querySelectorAll(".palette-color").forEach((el) => {
+      if (el.dataset.rgbFull === hexColor) {
+        el.classList.add("locked");
+      }
+    });
+  }
+});
+
+// Click slide original canvas to add/remove custom color
+document
+  .getElementById("slideOriginalCanvas")
+  .addEventListener("click", (e) => {
+    const slideOriginalCanvas = document.getElementById("slideOriginalCanvas");
+    const rect = slideOriginalCanvas.getBoundingClientRect();
+    const x = Math.floor(
+      (e.clientX - rect.left) * (slideOriginalCanvas.width / rect.width),
+    );
+    const y = Math.floor(
+      (e.clientY - rect.top) * (slideOriginalCanvas.height / rect.height),
+    );
+
+    // Get the color from the original canvas
+    const ctx = slideOriginalCanvas.getContext("2d");
+    const pixel = ctx.getImageData(x, y, 1, 1).data;
+
+    // Apply curves adjustments to get the adjusted color
+    let r = pixel[0];
+    let g = pixel[1];
+    let b = pixel[2];
+
+    // Apply curves if available
+    if (typeof curvesEditor !== "undefined" && curvesEditor.applyToPixel) {
+      const adjusted = curvesEditor.applyToPixel(r, g, b);
+      r = adjusted.r;
+      g = adjusted.g;
+      b = adjusted.b;
+    }
+
+    // Apply brightness/contrast/saturation/gamma adjustments
+    const brightness = parseInt(document.getElementById("brightness").value);
+    const contrast = parseInt(document.getElementById("contrast").value);
+    const saturation = parseInt(document.getElementById("saturation").value);
+    const gamma = parseFloat(document.getElementById("gamma").value);
+
+    // Apply brightness
+    r += brightness;
+    g += brightness;
+    b += brightness;
+
+    // Apply contrast
+    const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+    r = contrastFactor * (r - 128) + 128;
+    g = contrastFactor * (g - 128) + 128;
+    b = contrastFactor * (b - 128) + 128;
+
+    // Apply saturation
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    const satFactor = 1 + saturation / 100;
+    r = gray + (r - gray) * satFactor;
+    g = gray + (g - gray) * satFactor;
+    b = gray + (b - gray) * satFactor;
+
+    // Apply gamma
+    r = 255 * Math.pow(r / 255, 1 / gamma);
+    g = 255 * Math.pow(g / 255, 1 / gamma);
+    b = 255 * Math.pow(b / 255, 1 / gamma);
+
+    // Clamp to valid range
+    r = Math.max(0, Math.min(255, Math.round(r)));
+    g = Math.max(0, Math.min(255, Math.round(g)));
+    b = Math.max(0, Math.min(255, Math.round(b)));
+
+    // Convert to 12-bit color (4 bits per channel)
+    const r12bit = Math.round(r / 17) * 17;
+    const g12bit = Math.round(g / 17) * 17;
+    const b12bit = Math.round(b / 17) * 17;
+
+    // Convert to full hex format
+    const hexR = r12bit.toString(16).padStart(2, "0");
+    const hexG = g12bit.toString(16).padStart(2, "0");
+    const hexB = b12bit.toString(16).padStart(2, "0");
+    const hexColor = `#${hexR}${hexG}${hexB}`.toUpperCase();
+
+    // Toggle locked state
+    if (lockedColors.has(hexColor)) {
+      lockedColors.delete(hexColor);
+    } else {
+      lockedColors.add(hexColor);
+    }
+
+    // Reconvert to apply changes
+    if (window.sourceImage) {
+      convertImage();
+    }
+  });
+
+// Add color button
+document.getElementById("addColorBtn").addEventListener("click", () => {
+  document.getElementById("addColorModal").classList.add("active");
+  document.getElementById("customColorInput").value = "";
+  document.getElementById("customColorInput").focus();
+});
+
+document.getElementById("cancelAddColor").addEventListener("click", () => {
+  document.getElementById("addColorModal").classList.remove("active");
+});
+
+document.getElementById("confirmAddColor").addEventListener("click", () => {
+  addCustomColor();
+});
+
+document
+  .getElementById("customColorInput")
+  .addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      addCustomColor();
+    }
+  });
+
+function addCustomColor() {
+  const input = document.getElementById("customColorInput").value.trim();
+  let hex = null;
+
+  // Match 3-digit or 6-digit hex
+  const hex3Match = input.match(/^#?([0-9A-Fa-f]{3})$/);
+  const hex6Match = input.match(/^#?([0-9A-Fa-f]{6})$/);
+
+  if (hex3Match) {
+    // Expand 3-digit to 6-digit by duplicating each digit
+    const [r, g, b] = hex3Match[1].split("");
+    hex = `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  } else if (hex6Match) {
+    hex = "#" + hex6Match[1].toUpperCase();
+  }
+
+  if (hex) {
+    lockedColors.add(hex);
+    document.getElementById("addColorModal").classList.remove("active");
+    if (window.sourceImage) {
+      convertImage();
+    }
+  } else {
+    alert("Please enter a valid hex color (e.g., #F03 or #FF0033)");
+  }
+}
+
+// Clear locks button
+document.getElementById("clearLocksBtn").addEventListener("click", () => {
+  lockedColors.clear();
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
+
+// Close modal on background click
+document.getElementById("addColorModal").addEventListener("click", (e) => {
+  if (e.target.id === "addColorModal") {
+    document.getElementById("addColorModal").classList.remove("active");
+  }
+});

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed:*)",
+      "Bash(/Users/BatesGW1/projects/amiga-convert-web/styles.css)",
+      "Bash(/Users/BatesGW1/projects/amiga-convert-web/app.js)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

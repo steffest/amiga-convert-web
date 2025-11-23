@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Amiga 12-bit Color Preview</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="main-layout">
+        <div class="controls">
+          <div class="control-group">
+            <h3>Image</h3>
+            <div class="file-input-wrapper">
+              <input type="file" id="imageInput" accept="image/*" />
+              <label for="imageInput" class="file-input-label">
+                Choose Image
+              </label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <h3>Conversion</h3>
+            <div class="control-item">
+              <label>Colors</label>
+              <div class="slider-with-input">
+                <input
+                  type="range"
+                  id="colors"
+                  min="2"
+                  max="256"
+                  value="32"
+                  step="1"
+                />
+                <input
+                  type="number"
+                  id="colorsNumber"
+                  min="2"
+                  max="256"
+                  value="32"
+                  step="1"
+                />
+              </div>
+            </div>
+            <div class="control-item">
+              <label for="quantMethod">Quantization</label>
+              <select id="quantMethod">
+                <option value="rgbquant" selected>RGB Quant (best)</option>
+                <option value="wuquant">Wu Quant (fast)</option>
+                <option value="neuquant">Neu Quant (slow)</option>
+                <option value="median-cut">Median Cut</option>
+              </select>
+            </div>
+            <div class="control-item">
+              <label for="ditherMethod">Dithering</label>
+              <select id="ditherMethod">
+                <option value="floyd-steinberg" selected>
+                  Floyd-Steinberg
+                </option>
+                <option value="atkinson">Atkinson</option>
+                <option value="ordered">Ordered (Bayer)</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+            <div class="control-item">
+              <label>Dither Amount</label>
+              <div class="slider-with-input">
+                <input
+                  type="range"
+                  id="ditherAmount"
+                  min="0"
+                  max="1"
+                  value="1"
+                  step="0.01"
+                />
+                <input
+                  type="number"
+                  id="ditherAmountNumber"
+                  min="0"
+                  max="2"
+                  value="1"
+                  step="0.05"
+                />
+              </div>
+            </div>
+            <div
+              class="control-item"
+              id="bayerSizeControl"
+              style="display: none"
+            >
+              <label for="bayerSize">Bayer Matrix Size</label>
+              <select id="bayerSize">
+                <option value="2">2x2</option>
+                <option value="4">4x4</option>
+                <option value="8" selected>8x8</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <h3>Curves</h3>
+            <div class="control-group-content">
+              <div class="curves-inline">
+                <div class="curves-channel-selector">
+                  <button
+                    class="curves-channel-btn rgb active"
+                    data-channel="rgb"
+                  >
+                    RGB
+                  </button>
+                  <button class="curves-channel-btn red" data-channel="red">
+                    R
+                  </button>
+                  <button class="curves-channel-btn green" data-channel="green">
+                    G
+                  </button>
+                  <button class="curves-channel-btn blue" data-channel="blue">
+                    B
+                  </button>
+                </div>
+                <div class="curves-canvas-wrapper">
+                  <canvas
+                    id="curvesCanvas"
+                    class="curves-canvas"
+                    width="256"
+                    height="256"
+                  ></canvas>
+                </div>
+                <button class="curves-reset" id="curvesReset">
+                  Reset Curve
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <h3>Adjustments</h3>
+            <div class="control-group-content">
+              <button
+                class="curves-reset"
+                id="resetAllBtn"
+                style="margin-bottom: 12px"
+              >
+                Reset All Adjustments
+              </button>
+              <div class="control-item">
+                <label>Brightness</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="brightness"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                  <input
+                    type="number"
+                    id="brightnessNumber"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                </div>
+              </div>
+              <div class="control-item">
+                <label>Contrast</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="contrast"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                  <input
+                    type="number"
+                    id="contrastNumber"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                </div>
+              </div>
+              <div class="control-item">
+                <label>Saturation</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="saturation"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                  <input
+                    type="number"
+                    id="saturationNumber"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                </div>
+              </div>
+              <div class="control-item">
+                <label>Gamma</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="gamma"
+                    min="0.2"
+                    max="3"
+                    value="1"
+                    step="0.05"
+                  />
+                  <input
+                    type="number"
+                    id="gammaNumber"
+                    min="0.2"
+                    max="3"
+                    value="1"
+                    step="0.05"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="status" id="status">Load an image to begin</div>
+        </div>
+
+        <div class="canvas-container">
+          <div class="preview-controls">
+            <div class="preview-controls-left">
+              <div>
+                <label for="viewMode">View:</label>
+                <select id="viewMode">
+                  <option value="side-by-side">Side by Side</option>
+                  <option value="original-only">Original Only</option>
+                  <option value="preview-only">Preview Only</option>
+                  <option value="slide-reveal">Slide Reveal</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="zoomLevel">Zoom:</label>
+                <select id="zoomLevel">
+                  <option value="fit">Fit</option>
+                  <option value="1">100%</option>
+                  <option value="2">200%</option>
+                  <option value="4">400%</option>
+                </select>
+              </div>
+            </div>
+
+            <button id="downloadBtn" disabled>Download Result</button>
+          </div>
+
+          <div class="canvas-display" id="canvasDisplay">
+            <div class="drop-message">
+              Drop an image here or use "Choose Image" button
+            </div>
+
+            <div
+              class="canvas-grid side-by-side"
+              id="canvasGrid"
+              style="display: none"
+            >
+              <div class="canvas-wrapper" id="originalWrapper">
+                <h3>Original</h3>
+                <div class="canvas-scroll">
+                  <canvas id="originalCanvas"></canvas>
+                </div>
+              </div>
+              <div class="canvas-wrapper" id="previewWrapper">
+                <h3>Amiga 12-bit Preview</h3>
+                <div class="canvas-scroll">
+                  <canvas id="previewCanvas"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="slide-reveal-container"
+              id="slideRevealContainer"
+              style="display: none"
+            >
+              <div class="slide-reveal-wrapper" id="slideRevealWrapper">
+                <canvas
+                  id="slidePreviewCanvas"
+                  class="slide-canvas-bottom"
+                ></canvas>
+                <canvas
+                  id="slideOriginalCanvas"
+                  class="slide-canvas-top"
+                ></canvas>
+                <div class="slide-divider" id="slideDivider"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="palette-display" id="paletteDisplay"></div>
+          <div class="palette-actions hidden" id="paletteActions">
+            <button id="addColorBtn">Add Color</button>
+            <button id="clearLocksBtn">Clear Locks</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="add-color-modal" id="addColorModal">
+      <div class="add-color-content">
+        <h3>Add Custom Color</h3>
+        <label for="customColorInput"
+          >12-bit Hex Color (e.g., #F03 or #FF0033)</label
+        >
+        <input type="text" id="customColorInput" placeholder="#F03" />
+        <div class="button-group">
+          <button id="cancelAddColor">Cancel</button>
+          <button id="confirmAddColor">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
