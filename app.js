@@ -1397,106 +1397,104 @@ function displayPalette(palette) {
 async function convertImage() {
   if (!window.sourceImage) return;
 
-  const statusEl = document.getElementById("status");
-  statusEl.textContent = "Processing...";
-  statusEl.className = "status processing";
-
   // Show palette actions
   document.getElementById("paletteActions").classList.remove("hidden");
 
   // Use setTimeout to allow UI to update
   setTimeout(() => {
-    try {
-      const originalCanvas = document.getElementById("originalCanvas");
-      const previewCanvas = document.getElementById("previewCanvas");
-      const slideOriginalCanvas = document.getElementById(
-        "slideOriginalCanvas",
-      );
-      const slidePreviewCanvas = document.getElementById("slidePreviewCanvas");
+    const originalCanvas = document.getElementById("originalCanvas");
+    const previewCanvas = document.getElementById("previewCanvas");
+    const slideOriginalCanvas = document.getElementById("slideOriginalCanvas");
+    const slidePreviewCanvas = document.getElementById("slidePreviewCanvas");
 
-      const ctx = originalCanvas.getContext("2d", {
-        willReadFrequently: true,
-      });
-      const previewCtx = previewCanvas.getContext("2d");
+    const ctx = originalCanvas.getContext("2d", {
+      willReadFrequently: true,
+    });
+    const previewCtx = previewCanvas.getContext("2d");
 
-      // Always process at original image size
-      const width = window.sourceImage.width;
-      const height = window.sourceImage.height;
+    // Get resize dimensions (will auto-detect if different from original)
+    const resizeWidth = parseInt(document.getElementById("resizeWidth").value);
+    const resizeHeight = parseInt(
+      document.getElementById("resizeHeight").value,
+    );
 
-      // Set canvas sizes to original
-      originalCanvas.width = width;
-      originalCanvas.height = height;
-      previewCanvas.width = width;
-      previewCanvas.height = height;
-      slideOriginalCanvas.width = width;
-      slideOriginalCanvas.height = height;
-      slidePreviewCanvas.width = width;
-      slidePreviewCanvas.height = height;
+    // Use resize dimensions if valid, otherwise use original
+    const width =
+      !isNaN(resizeWidth) && resizeWidth > 0
+        ? resizeWidth
+        : window.sourceImage.width;
+    const height =
+      !isNaN(resizeHeight) && resizeHeight > 0
+        ? resizeHeight
+        : window.sourceImage.height;
 
-      // Draw original to main canvas
-      ctx.drawImage(window.sourceImage, 0, 0, width, height);
+    // Set canvas sizes
+    originalCanvas.width = width;
+    originalCanvas.height = height;
+    previewCanvas.width = width;
+    previewCanvas.height = height;
+    slideOriginalCanvas.width = width;
+    slideOriginalCanvas.height = height;
+    slidePreviewCanvas.width = width;
+    slidePreviewCanvas.height = height;
 
-      // Get image data and calculate histogram
-      let imageData = ctx.getImageData(0, 0, width, height);
-      curvesEditor.calculateHistogram(imageData);
+    // Draw original to main canvas (resized if enabled)
+    ctx.drawImage(window.sourceImage, 0, 0, width, height);
 
-      const brightness = parseInt(document.getElementById("brightness").value);
-      const contrast = parseInt(document.getElementById("contrast").value);
-      const saturation = parseInt(document.getElementById("saturation").value);
-      const gamma = parseFloat(document.getElementById("gamma").value);
+    // Get image data and calculate histogram
+    let imageData = ctx.getImageData(0, 0, width, height);
+    curvesEditor.calculateHistogram(imageData);
 
-      imageData = applyAdjustments(
-        imageData,
-        brightness,
-        contrast,
-        saturation,
-        gamma,
-      );
+    const brightness = parseInt(document.getElementById("brightness").value);
+    const contrast = parseInt(document.getElementById("contrast").value);
+    const saturation = parseInt(document.getElementById("saturation").value);
+    const gamma = parseFloat(document.getElementById("gamma").value);
 
-      // Build palette
-      const colorCount = parseInt(document.getElementById("colors").value);
-      const quantMethod = document.getElementById("quantMethod").value;
-      const palette = buildPalette(imageData, colorCount, quantMethod);
+    imageData = applyAdjustments(
+      imageData,
+      brightness,
+      contrast,
+      saturation,
+      gamma,
+    );
 
-      // Apply dithering
-      const ditherMethod = document.getElementById("ditherMethod").value;
-      const ditherAmount = parseFloat(
-        document.getElementById("ditherAmount").value,
-      );
-      const bayerSize = parseInt(document.getElementById("bayerSize").value);
+    // Build palette
+    const colorCount = parseInt(document.getElementById("colors").value);
+    const quantMethod = document.getElementById("quantMethod").value;
+    const palette = buildPalette(imageData, colorCount, quantMethod);
 
-      imageData = applyDithering(
-        imageData,
-        palette,
-        ditherMethod,
-        ditherAmount,
-        bayerSize,
-      );
+    // Apply dithering
+    const ditherMethod = document.getElementById("ditherMethod").value;
+    const ditherAmount = parseFloat(
+      document.getElementById("ditherAmount").value,
+    );
+    const bayerSize = parseInt(document.getElementById("bayerSize").value);
 
-      // Draw results to all canvases
-      previewCtx.putImageData(imageData, 0, 0);
+    imageData = applyDithering(
+      imageData,
+      palette,
+      ditherMethod,
+      ditherAmount,
+      bayerSize,
+    );
 
-      // Draw to slide reveal canvases
-      const slideOriginalCtx = slideOriginalCanvas.getContext("2d");
-      const slidePreviewCtx = slidePreviewCanvas.getContext("2d");
-      slidePreviewCtx.putImageData(imageData, 0, 0);
-      slideOriginalCtx.drawImage(window.sourceImage, 0, 0, width, height);
+    // Draw results to all canvases
+    previewCtx.putImageData(imageData, 0, 0);
 
-      // Display palette
-      displayPalette(palette);
+    // Draw to slide reveal canvases
+    const slideOriginalCtx = slideOriginalCanvas.getContext("2d");
+    const slidePreviewCtx = slidePreviewCanvas.getContext("2d");
+    slidePreviewCtx.putImageData(imageData, 0, 0);
+    slideOriginalCtx.drawImage(window.sourceImage, 0, 0, width, height);
 
-      // Update view mode
-      updateViewMode();
+    // Display palette
+    displayPalette(palette);
 
-      // Enable download
-      document.getElementById("downloadBtn").disabled = false;
+    // Update view mode
+    updateViewMode();
 
-      statusEl.textContent = "Ready";
-      statusEl.className = "status";
-    } catch (error) {
-      statusEl.textContent = "Error: " + error.message;
-      statusEl.className = "status error";
-    }
+    // Enable download
+    document.getElementById("downloadBtn").disabled = false;
   }, 10);
 }
 
@@ -1651,6 +1649,14 @@ function loadImageFile(file) {
     const img = new Image();
     img.onload = () => {
       window.sourceImage = img;
+
+      // Set resize dimensions to image's natural size
+      document.getElementById("resizeWidth").value = img.width;
+      document.getElementById("resizeHeight").value = img.height;
+
+      // Store aspect ratio for lock functionality
+      window.sourceAspectRatio = img.width / img.height;
+
       document.getElementById("canvasDisplay").classList.add("has-image");
       document.getElementById("canvasGrid").style.display = "grid";
       convertImage();
@@ -1673,6 +1679,15 @@ document.getElementById("ditherMethod").addEventListener("change", (e) => {
   bayerControl.style.display = e.target.value === "ordered" ? "block" : "none";
 });
 
+// Debounce function for performance
+let conversionTimeout;
+function debouncedConvertImage() {
+  clearTimeout(conversionTimeout);
+  conversionTimeout = setTimeout(() => {
+    convertImage();
+  }, 20); // ms delay
+}
+
 // Trigger conversion on any control change
 const controls = [
   "colors",
@@ -1685,9 +1700,29 @@ const controls = [
   "saturation",
   "gamma",
 ];
-controls.forEach((id) => {
-  document.getElementById(id).addEventListener("input", convertImage);
-  document.getElementById(id).addEventListener("change", convertImage);
+
+// Continuous controls (sliders) use debouncing for smooth interaction
+const continuousControls = [
+  "colors",
+  "ditherAmount",
+  "brightness",
+  "contrast",
+  "saturation",
+  "gamma",
+];
+
+// Discrete controls (dropdowns) convert immediately
+const discreteControls = ["quantMethod", "ditherMethod", "bayerSize"];
+
+continuousControls.forEach((id) => {
+  const element = document.getElementById(id);
+  element.addEventListener("input", debouncedConvertImage); // Debounced while dragging
+  element.addEventListener("change", convertImage); // Immediate on release
+});
+
+discreteControls.forEach((id) => {
+  const element = document.getElementById(id);
+  element.addEventListener("change", convertImage); // Immediate for dropdowns
 });
 
 // View mode and zoom changes
@@ -2317,5 +2352,68 @@ document.getElementById("clearLocksBtn").addEventListener("click", () => {
 document.getElementById("addColorModal").addEventListener("click", (e) => {
   if (e.target.id === "addColorModal") {
     document.getElementById("addColorModal").classList.remove("active");
+  }
+});
+
+// Aspect ratio lock functionality
+let lastEditedDimension = null;
+
+document.getElementById("resizeWidth").addEventListener("input", (e) => {
+  lastEditedDimension = "width";
+  const aspectLocked = document.getElementById("aspectRatioLock").checked;
+
+  if (aspectLocked && window.sourceAspectRatio) {
+    const newWidth = parseInt(e.target.value);
+    if (!isNaN(newWidth) && newWidth > 0) {
+      const newHeight = Math.round(newWidth / window.sourceAspectRatio);
+      document.getElementById("resizeHeight").value = newHeight;
+    }
+  }
+});
+
+document.getElementById("resizeHeight").addEventListener("input", (e) => {
+  lastEditedDimension = "height";
+  const aspectLocked = document.getElementById("aspectRatioLock").checked;
+
+  if (aspectLocked && window.sourceAspectRatio) {
+    const newHeight = parseInt(e.target.value);
+    if (!isNaN(newHeight) && newHeight > 0) {
+      const newWidth = Math.round(newHeight * window.sourceAspectRatio);
+      document.getElementById("resizeWidth").value = newWidth;
+    }
+  }
+});
+
+// Trigger conversion when dimension values change (on blur or enter)
+document.getElementById("resizeWidth").addEventListener("change", () => {
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
+
+document.getElementById("resizeHeight").addEventListener("change", () => {
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
+
+// Handle aspect ratio lock toggle
+document.getElementById("aspectRatioLock").addEventListener("change", (e) => {
+  if (e.target.checked && window.sourceAspectRatio) {
+    // When locking, update based on the last edited dimension
+    const widthInput = document.getElementById("resizeWidth");
+    const heightInput = document.getElementById("resizeHeight");
+
+    if (lastEditedDimension === "width") {
+      const width = parseInt(widthInput.value);
+      if (!isNaN(width) && width > 0) {
+        heightInput.value = Math.round(width / window.sourceAspectRatio);
+      }
+    } else {
+      const height = parseInt(heightInput.value);
+      if (!isNaN(height) && height > 0) {
+        widthInput.value = Math.round(height * window.sourceAspectRatio);
+      }
+    }
   }
 });

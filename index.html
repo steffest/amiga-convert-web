@@ -232,7 +232,38 @@
             </div>
           </div>
 
-          <div class="status" id="status">Load an image to begin</div>
+          <div class="control-group">
+            <h3>Resize</h3>
+            <div class="control-group-content">
+              <div class="control-item">
+                <div class="resize-inputs">
+                  <input
+                    type="number"
+                    id="resizeWidth"
+                    min="1"
+                    max="4096"
+                    value="320"
+                    placeholder="Width"
+                  />
+                  <span class="resize-separator">×</span>
+                  <input
+                    type="number"
+                    id="resizeHeight"
+                    min="1"
+                    max="4096"
+                    value="256"
+                    placeholder="Height"
+                  />
+                </div>
+              </div>
+              <div class="control-item">
+                <label>
+                  <input type="checkbox" id="aspectRatioLock" checked />
+                  Lock Aspect Ratio
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="canvas-container">
