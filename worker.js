@@ -181,13 +181,33 @@ function applyCurves(imageData, curvesLUTs) {
 }
 
 // Apply adjustments (brightness, contrast, saturation, hue, gamma)
-function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamma, curvesLUTs) {
-  // Apply curves first if provided
+function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamma, curvesLUTs, matteColor) {
+  const data = imageData.data;
+
+  // First, composite alpha onto matte color if provided
+  if (matteColor) {
+    const mr = matteColor.r;
+    const mg = matteColor.g;
+    const mb = matteColor.b;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3] / 255;
+
+      if (alpha < 1) {
+        // Composite: result = source * alpha + matte * (1 - alpha)
+        data[i] = data[i] * alpha + mr * (1 - alpha);
+        data[i + 1] = data[i + 1] * alpha + mg * (1 - alpha);
+        data[i + 2] = data[i + 2] * alpha + mb * (1 - alpha);
+        data[i + 3] = 255; // Set to fully opaque
+      }
+    }
+  }
+
+  // Apply curves after compositing
   if (curvesLUTs) {
     imageData = applyCurves(imageData, curvesLUTs);
   }
 
-  const data = imageData.data;
   const contrastFactor = (contrast + 100) / 100;
   const brightnessFactor = brightness / 100;
   const saturationFactor = (saturation + 100) / 100;
@@ -939,7 +959,8 @@ self.addEventListener('message', function(e) {
       params.saturation,
       params.hue,
       params.gamma,
-      params.curvesLUTs
+      params.curvesLUTs,
+      params.matteColor
     );
 
     // Build palette

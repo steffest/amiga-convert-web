@@ -2132,6 +2132,24 @@ async function convertImage() {
     currentConversionId++;
     const thisConversionId = currentConversionId;
 
+    // Parse matte color from text input (supports #FFF or #FFFFFF)
+    const matteHex = document.getElementById("matteColorInput").value.trim();
+    let matteR = 255,
+      matteG = 255,
+      matteB = 255;
+
+    if (matteHex.match(/^#[0-9A-Fa-f]{3}$/)) {
+      // 3-digit hex
+      matteR = parseInt(matteHex[1] + matteHex[1], 16);
+      matteG = parseInt(matteHex[2] + matteHex[2], 16);
+      matteB = parseInt(matteHex[3] + matteHex[3], 16);
+    } else if (matteHex.match(/^#[0-9A-Fa-f]{6}$/)) {
+      // 6-digit hex
+      matteR = parseInt(matteHex.slice(1, 3), 16);
+      matteG = parseInt(matteHex.slice(3, 5), 16);
+      matteB = parseInt(matteHex.slice(5, 7), 16);
+    }
+
     // Gather all parameters
     const params = {
       brightness: parseInt(document.getElementById("brightness").value),
@@ -2147,6 +2165,7 @@ async function convertImage() {
       ditherMethod: document.getElementById("ditherMethod").value,
       ditherAmount: parseFloat(document.getElementById("ditherAmount").value),
       bayerSize: parseInt(document.getElementById("bayerSize").value),
+      matteColor: { r: matteR, g: matteG, b: matteB },
     };
 
     // Send to worker for processing (copy data, don't transfer)
@@ -2371,6 +2390,7 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("ditherMethod").value = "floyd-steinberg";
   document.getElementById("quantMethod").value = "rgbquant";
   document.getElementById("colorDistance").value = "rgb-euclidean";
+  document.getElementById("matteColorInput").value = "#fff";
 
   // Set initial visibility for conditional controls
   document.getElementById("bayerSizeControl").style.display = "none";
@@ -2457,6 +2477,11 @@ discreteControls.forEach((id) => {
   const element = document.getElementById(id);
   element.addEventListener("change", convertImage); // Immediate for dropdowns
 });
+
+// Matte color input converts on change (when user finishes typing)
+document
+  .getElementById("matteColorInput")
+  .addEventListener("change", convertImage);
 
 // View mode and zoom changes
 document.getElementById("viewMode").addEventListener("change", () => {
