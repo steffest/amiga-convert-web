@@ -23,6 +23,7 @@ const curvesEditor = {
   },
   histogram: null,
   draggingPoint: null,
+  selectedPoint: null,
 
   init() {
     this.canvas = document.getElementById("curvesCanvas");
@@ -35,6 +36,33 @@ const curvesEditor = {
     this.canvas.addEventListener("mouseleave", () => this.onMouseUp());
     this.canvas.addEventListener("dblclick", (e) => this.onDoubleClick(e));
 
+    // Keyboard events for deleting selected point
+    window.addEventListener("keydown", (e) => {
+      // Ignore if typing in an input field
+      const activeElement = document.activeElement;
+      const isTyping =
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          activeElement.tagName === "SELECT");
+
+      if (
+        !isTyping &&
+        (e.key === "Delete" || e.key === "Backspace") &&
+        this.selectedPoint !== null
+      ) {
+        const curve = this.curves[this.currentChannel];
+        // Don't delete first or last point (anchors)
+        if (this.selectedPoint > 0 && this.selectedPoint < curve.length - 1) {
+          curve.splice(this.selectedPoint, 1);
+          this.selectedPoint = null;
+          this.draw();
+          convertImage();
+          e.preventDefault(); // Prevent browser back navigation on Backspace
+        }
+      }
+    });
+
     // Channel selector
     document.querySelectorAll(".curves-channel-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -43,6 +71,7 @@ const curvesEditor = {
           .forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         this.currentChannel = btn.dataset.channel;
+        this.selectedPoint = null; // Clear selection when switching channels
         this.draw();
       });
     });
@@ -137,9 +166,14 @@ const curvesEditor = {
       const dist = Math.sqrt((pos.x - p.x) ** 2 + (pos.y - p.y) ** 2);
       if (dist < 10) {
         this.draggingPoint = i;
+        this.selectedPoint = i;
+        this.draw(); // Redraw to show selection
         return;
       }
     }
+
+    // Deselect if clicking elsewhere
+    this.selectedPoint = null;
 
     // Add new point
     const value = this.canvasToValue(pos.x, pos.y);
@@ -154,6 +188,7 @@ const curvesEditor = {
       this.draggingPoint = curve.findIndex(
         (p) => p[0] === value.input && p[1] === value.output,
       );
+      this.selectedPoint = this.draggingPoint; // Select newly created point
       this.draw();
       convertImage(); // Real-time update
     }
@@ -179,6 +214,7 @@ const curvesEditor = {
     this.draggingPoint = curve.findIndex(
       (p) => p[0] === value.input && p[1] === value.output,
     );
+    this.selectedPoint = this.draggingPoint; // Keep selection in sync
 
     this.draw();
     convertImage(); // Real-time update
@@ -212,102 +248,30 @@ const curvesEditor = {
     const startInput = curve[0][0];
     const endInput = curve[curve.length - 1][0];
 
-    // Calculate tangents using finite differences with smoothing
+    // Calculate tangents using Catmull-Rom method (like Photoshop)
     const tangents = [];
     for (let i = 0; i < curve.length; i++) {
       if (curve.length === 2) {
-        // For 2 points, tangents match the line slope
+        // For 2 points, linear interpolation
         const dx = curve[1][0] - curve[0][0];
         const dy = curve[1][1] - curve[0][1];
         tangents.push(dx === 0 ? 0 : dy / dx);
       } else if (i === 0) {
-        // First point: use slope to next point
+        // First point: use Catmull-Rom end condition
         const dx = curve[1][0] - curve[0][0];
         const dy = curve[1][1] - curve[0][1];
         tangents.push(dx === 0 ? 0 : dy / dx);
       } else if (i === curve.length - 1) {
-        // Last point: use slope from previous point
+        // Last point: use Catmull-Rom end condition
         const dx = curve[i][0] - curve[i - 1][0];
         const dy = curve[i][1] - curve[i - 1][1];
         tangents.push(dx === 0 ? 0 : dy / dx);
       } else {
-        // Interior points: use finite difference method
-        const prev = curve[i - 1];
-        const curr = curve[i];
-        const next = curve[i + 1];
-
-        // Calculate secant slopes
-        const dx_prev = curr[0] - prev[0];
-        const dy_prev = curr[1] - prev[1];
-        const dx_next = next[0] - curr[0];
-        const dy_next = next[1] - curr[1];
-
-        const m_prev = dx_prev === 0 ? 0 : dy_prev / dx_prev;
-        const m_next = dx_next === 0 ? 0 : dy_next / dx_next;
-
-        // Use weighted average for smooth tangent
-        const w_prev = dx_next;
-        const w_next = dx_prev;
-        const w_total = w_prev + w_next;
-
-        if (w_total === 0) {
-          tangents.push(0);
-        } else {
-          const m = (w_prev * m_prev + w_next * m_next) / w_total;
-
-          // Apply monotonicity constraint
-          if (m_prev * m_next <= 0) {
-            tangents.push(0);
-          } else {
-            // Limit tangent to prevent overshooting beyond [0, 255]
-            const alpha = m / m_prev;
-            const beta = m / m_next;
-
-            if (alpha < 0 || beta < 0) {
-              tangents.push(0);
-            } else if (alpha * alpha + beta * beta > 9) {
-              const tau = 3 / Math.sqrt(alpha * alpha + beta * beta);
-              tangents.push(tau * m);
-            } else {
-              tangents.push(m);
-            }
-          }
-        }
-      }
-    }
-
-    // Adjust tangents to prevent curve from going out of bounds [0, 255]
-    for (let i = 0; i < curve.length - 1; i++) {
-      const p0 = curve[i];
-      const p1 = curve[i + 1];
-      const m0 = tangents[i];
-      const m1 = tangents[i + 1];
-      const dx = p1[0] - p0[0];
-
-      if (dx > 0) {
-        // Check if curve would exceed bounds and reduce tangents if needed
-        const samples = 10;
-        for (let s = 0; s <= samples; s++) {
-          const t = s / samples;
-          const t2 = t * t;
-          const t3 = t2 * t;
-
-          const h00 = 2 * t3 - 3 * t2 + 1;
-          const h10 = t3 - 2 * t2 + t;
-          const h01 = -2 * t3 + 3 * t2;
-          const h11 = t3 - t2;
-
-          const y = h00 * p0[1] + h10 * dx * m0 + h01 * p1[1] + h11 * dx * m1;
-
-          // If curve overshoots, scale down tangents
-          if (y < 0 || y > 255) {
-            const scale = 0.5;
-            tangents[i] *= scale;
-            tangents[i + 1] *= scale;
-            i--; // Recheck this segment
-            break;
-          }
-        }
+        // Interior points: standard Catmull-Rom tangent
+        // m = (p[i+1] - p[i-1]) / (x[i+1] - x[i-1])
+        const dx = curve[i + 1][0] - curve[i - 1][0];
+        const dy = curve[i + 1][1] - curve[i - 1][1];
+        tangents.push(dx === 0 ? 0 : dy / dx);
       }
     }
 
@@ -456,11 +420,14 @@ const curvesEditor = {
     ctx.stroke();
 
     // Draw control points
-    ctx.fillStyle = "#ffffff";
-    for (const point of curve) {
+    for (let i = 0; i < curve.length; i++) {
+      const point = curve[i];
       const pos = this.valueToCanvas(point[0], point[1]);
+      const isSelected = i === this.selectedPoint;
+
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y, isSelected ? 6 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = isSelected ? "#4a9eff" : "#ffffff";
       ctx.fill();
       ctx.strokeStyle = "#1a1a1a";
       ctx.lineWidth = 2;
@@ -1663,7 +1630,8 @@ function loadImageFile(file) {
       document.getElementById("canvasDisplay").classList.add("has-image");
       document.getElementById("canvasGrid").style.display = "grid";
 
-      // Show "Change Image" button
+      // Toggle image buttons
+      document.getElementById("chooseImageBtn").style.display = "none";
       document.getElementById("changeImageBtn").style.display = "block";
 
       convertImage();
@@ -1677,6 +1645,7 @@ function loadImageFile(file) {
 window.addEventListener("DOMContentLoaded", () => {
   // Reset to empty state
   document.getElementById("downloadBtn").disabled = true;
+  document.getElementById("chooseImageBtn").style.display = "block";
   document.getElementById("changeImageBtn").style.display = "none";
   document.getElementById("canvasDisplay").classList.remove("has-image");
   document.getElementById("canvasGrid").style.display = "none";
@@ -1700,7 +1669,12 @@ document.getElementById("dropMessage").addEventListener("click", () => {
   document.getElementById("imageInput").click();
 });
 
-// Change Image button
+// Choose Image button (empty state)
+document.getElementById("chooseImageBtn").addEventListener("click", () => {
+  document.getElementById("imageInput").click();
+});
+
+// Change Image button (loaded state)
 document.getElementById("changeImageBtn").addEventListener("click", () => {
   document.getElementById("imageInput").click();
 });
