@@ -13,94 +13,98 @@
         <div class="controls">
           <div class="control-group">
             <h3>Conversion</h3>
-            <div class="control-item">
-              <label>Colors</label>
-              <div class="slider-with-input">
-                <input
-                  type="range"
-                  id="colors"
-                  min="2"
-                  max="256"
-                  value="32"
-                  step="1"
-                />
-                <input
-                  type="number"
-                  id="colorsNumber"
-                  min="2"
-                  max="256"
-                  value="32"
-                  step="1"
-                />
+            <div class="control-group-content">
+              <div class="control-item">
+                <label>Colors</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="colors"
+                    min="2"
+                    max="256"
+                    value="32"
+                    step="1"
+                  />
+                  <input
+                    type="number"
+                    id="colorsNumber"
+                    min="2"
+                    max="256"
+                    value="32"
+                    step="1"
+                  />
+                </div>
               </div>
-            </div>
-            <div class="control-item">
-              <label for="quantMethod">Quantization</label>
-              <select id="quantMethod">
-                <option value="rgbquant" selected>RGB Quant (best)</option>
-                <option value="wuquant">Wu Quant (fast)</option>
-                <option value="neuquant">Neu Quant (slow)</option>
-                <option value="median-cut">Median Cut</option>
-              </select>
-            </div>
-            <div class="control-item">
-              <label for="colorDistance">Color Distance</label>
-              <select id="colorDistance">
-                <option value="rgb-euclidean" selected>
-                  RGB Euclidean (fast)
-                </option>
-                <option value="weighted-rgb">Weighted RGB (fast)</option>
-                <option value="redmean">Redmean (perceptual)</option>
-                <option value="cie76-lab">CIE76 LAB (accurate)</option>
-              </select>
-            </div>
-            <div class="control-item">
-              <label for="ditherMethod">Dithering</label>
-              <select id="ditherMethod">
-                <option value="floyd-steinberg" selected>
-                  Floyd-Steinberg
-                </option>
-                <option value="jarvis-judice-ninke">Jarvis-Judice-Ninke</option>
-                <option value="stucki">Stucki</option>
-                <option value="burkes">Burkes</option>
-                <option value="sierra">Sierra</option>
-                <option value="sierra-lite">Sierra Lite</option>
-                <option value="atkinson">Atkinson</option>
-                <option value="ordered">Ordered (Bayer)</option>
-                <option value="none">None</option>
-              </select>
-            </div>
-            <div
-              class="control-item"
-              id="bayerSizeControl"
-              style="display: none"
-            >
-              <label for="bayerSize">Bayer Matrix Size</label>
-              <select id="bayerSize">
-                <option value="2">2x2</option>
-                <option value="4">4x4</option>
-                <option value="8" selected>8x8</option>
-              </select>
-            </div>
-            <div class="control-item" id="ditherAmountControl">
-              <label>Dither Amount</label>
-              <div class="slider-with-input">
-                <input
-                  type="range"
-                  id="ditherAmount"
-                  min="0"
-                  max="1"
-                  value="0.5"
-                  step="0.01"
-                />
-                <input
-                  type="number"
-                  id="ditherAmountNumber"
-                  min="0"
-                  max="1"
-                  value="0.5"
-                  step="0.05"
-                />
+              <div class="control-item">
+                <label for="quantMethod">Quantization</label>
+                <select id="quantMethod">
+                  <option value="rgbquant" selected>RGB Quant (best)</option>
+                  <option value="wuquant">Wu Quant (fast)</option>
+                  <option value="neuquant">Neu Quant (slow)</option>
+                  <option value="median-cut">Median Cut</option>
+                </select>
+              </div>
+              <div class="control-item">
+                <label for="colorDistance">Color Distance</label>
+                <select id="colorDistance">
+                  <option value="rgb-euclidean" selected>
+                    RGB Euclidean (fast)
+                  </option>
+                  <option value="weighted-rgb">Weighted RGB (fast)</option>
+                  <option value="redmean">Redmean (perceptual)</option>
+                  <option value="cie76-lab">CIE76 LAB (accurate)</option>
+                </select>
+              </div>
+              <div class="control-item">
+                <label for="ditherMethod">Dithering</label>
+                <select id="ditherMethod">
+                  <option value="floyd-steinberg" selected>
+                    Floyd-Steinberg
+                  </option>
+                  <option value="jarvis-judice-ninke">
+                    Jarvis-Judice-Ninke
+                  </option>
+                  <option value="stucki">Stucki</option>
+                  <option value="burkes">Burkes</option>
+                  <option value="sierra">Sierra</option>
+                  <option value="sierra-lite">Sierra Lite</option>
+                  <option value="atkinson">Atkinson</option>
+                  <option value="ordered">Ordered (Bayer)</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+              <div
+                class="control-item"
+                id="bayerSizeControl"
+                style="display: none"
+              >
+                <label for="bayerSize">Bayer Matrix Size</label>
+                <select id="bayerSize">
+                  <option value="2">2x2</option>
+                  <option value="4">4x4</option>
+                  <option value="8" selected>8x8</option>
+                </select>
+              </div>
+              <div class="control-item" id="ditherAmountControl">
+                <label>Dither Amount</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="ditherAmount"
+                    min="0"
+                    max="1"
+                    value="0.5"
+                    step="0.01"
+                  />
+                  <input
+                    type="number"
+                    id="ditherAmountNumber"
+                    min="0"
+                    max="1"
+                    value="0.5"
+                    step="0.05"
+                  />
+                </div>
               </div>
             </div>
           </div>
