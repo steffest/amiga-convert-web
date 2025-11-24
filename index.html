@@ -44,6 +44,17 @@
               </select>
             </div>
             <div class="control-item">
+              <label for="colorDistance">Color Distance</label>
+              <select id="colorDistance">
+                <option value="rgb-euclidean" selected>
+                  RGB Euclidean (fast)
+                </option>
+                <option value="weighted-rgb">Weighted RGB (fast)</option>
+                <option value="redmean">Redmean (perceptual)</option>
+                <option value="cie76-lab">CIE76 LAB (accurate)</option>
+              </select>
+            </div>
+            <div class="control-item">
               <label for="ditherMethod">Dithering</label>
               <select id="ditherMethod">
                 <option value="floyd-steinberg" selected>
@@ -59,7 +70,19 @@
                 <option value="none">None</option>
               </select>
             </div>
-            <div class="control-item">
+            <div
+              class="control-item"
+              id="bayerSizeControl"
+              style="display: none"
+            >
+              <label for="bayerSize">Bayer Matrix Size</label>
+              <select id="bayerSize">
+                <option value="2">2x2</option>
+                <option value="4">4x4</option>
+                <option value="8" selected>8x8</option>
+              </select>
+            </div>
+            <div class="control-item" id="ditherAmountControl">
               <label>Dither Amount</label>
               <div class="slider-with-input">
                 <input
@@ -79,29 +102,6 @@
                   step="0.05"
                 />
               </div>
-            </div>
-            <div
-              class="control-item"
-              id="bayerSizeControl"
-              style="display: none"
-            >
-              <label for="bayerSize">Bayer Matrix Size</label>
-              <select id="bayerSize">
-                <option value="2">2x2</option>
-                <option value="4">4x4</option>
-                <option value="8" selected>8x8</option>
-              </select>
-            </div>
-            <div class="control-item">
-              <label for="colorDistance">Color Distance</label>
-              <select id="colorDistance">
-                <option value="rgb-euclidean" selected>
-                  RGB Euclidean (fast)
-                </option>
-                <option value="weighted-rgb">Weighted RGB (fast)</option>
-                <option value="redmean">Redmean (perceptual)</option>
-                <option value="cie76-lab">CIE76 LAB (accurate)</option>
-              </select>
             </div>
           </div>
 

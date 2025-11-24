@@ -230,7 +230,7 @@ const curvesEditor = {
     this.selectedPoint = this.draggingPoint; // Keep selection in sync
 
     this.draw();
-    throttledConvertImage(); // Throttled updates during dragging
+    convertImage(); // Immediate, pending logic handles rapid calls
   },
 
   onMouseUp() {
@@ -2066,6 +2066,15 @@ function displayPalette(palette) {
 async function convertImage() {
   if (!window.sourceImage) return;
 
+  // If a conversion is already in progress, mark that we need another one
+  if (conversionInProgress) {
+    pendingConversion = true;
+    return;
+  }
+
+  // Mark that we're starting a conversion
+  conversionInProgress = true;
+
   // Show palette actions
   document.getElementById("paletteActions").classList.remove("hidden");
 
@@ -2387,32 +2396,17 @@ document.getElementById("changeImageBtn").addEventListener("click", () => {
   document.getElementById("imageInput").click();
 });
 
-// Show/hide Bayer size control
+// Show/hide Bayer size control and dither amount
 document.getElementById("ditherMethod").addEventListener("change", (e) => {
+  const method = e.target.value;
   const bayerControl = document.getElementById("bayerSizeControl");
-  bayerControl.style.display = e.target.value === "ordered" ? "block" : "none";
+  const ditherAmountControl = document.getElementById("ditherAmountControl");
+
+  bayerControl.style.display = method === "ordered" ? "block" : "none";
+  ditherAmountControl.style.display = method === "none" ? "none" : "block";
 });
 
-// Throttle function - ensures updates happen DURING dragging, not just after
-let conversionTimeout;
-let lastConversionTime = 0;
-function throttledConvertImage() {
-  const now = Date.now();
-  const timeSinceLastConversion = now - lastConversionTime;
-
-  // If enough time has passed, convert immediately
-  if (timeSinceLastConversion >= 100) {
-    lastConversionTime = now;
-    convertImage();
-  } else {
-    // Otherwise, schedule for the remaining time
-    clearTimeout(conversionTimeout);
-    conversionTimeout = setTimeout(() => {
-      lastConversionTime = Date.now();
-      convertImage();
-    }, 100 - timeSinceLastConversion);
-  }
-}
+// No throttling needed - pending conversion logic handles rapid calls efficiently
 
 // Trigger conversion on any control change
 const controls = [
@@ -2449,8 +2443,8 @@ const discreteControls = [
 
 continuousControls.forEach((id) => {
   const element = document.getElementById(id);
-  element.addEventListener("input", throttledConvertImage); // Throttled updates during dragging
-  element.addEventListener("change", convertImage); // Immediate on release
+  element.addEventListener("input", convertImage); // Immediate, pending logic handles rapid calls
+  element.addEventListener("change", convertImage); // Also on release
 });
 
 discreteControls.forEach((id) => {
@@ -3394,6 +3388,8 @@ document.getElementById("aspectRatioLock").addEventListener("change", (e) => {
 // Web Worker setup for non-blocking image processing
 let conversionWorker = null;
 let currentConversionId = 0;
+let conversionInProgress = false;
+let pendingConversion = false;
 
 function initWorker() {
   if (conversionWorker) return;
@@ -3403,13 +3399,26 @@ function initWorker() {
   conversionWorker.addEventListener("message", function (e) {
     const { id, imageData, palette, success, error } = e.data;
 
+    // Mark conversion as complete
+    conversionInProgress = false;
+
     // Ignore stale results
     if (id !== currentConversionId) {
+      // If there's a pending conversion, start it now
+      if (pendingConversion) {
+        pendingConversion = false;
+        convertImage();
+      }
       return;
     }
 
     if (!success) {
       console.error("Worker error:", error);
+      // If there's a pending conversion, start it now
+      if (pendingConversion) {
+        pendingConversion = false;
+        convertImage();
+      }
       return;
     }
 
@@ -3438,10 +3447,22 @@ function initWorker() {
 
     // Enable download
     document.getElementById("downloadBtn").disabled = false;
+
+    // If there's a pending conversion, start it now
+    if (pendingConversion) {
+      pendingConversion = false;
+      convertImage();
+    }
   });
 
   conversionWorker.addEventListener("error", function (e) {
     console.error("Worker error:", e);
+    conversionInProgress = false;
+    // If there's a pending conversion, start it now
+    if (pendingConversion) {
+      pendingConversion = false;
+      convertImage();
+    }
   });
 }
 

@@ -795,24 +795,34 @@ function applyDithering(imageData, palette, method, amount, bayerSize, metric) {
     }
   } else if (method === "ordered") {
     const bayerMatrix = generateBayerMatrix(bayerSize);
-    const threshold = (size) => size * size;
+    const matrixSize = bayerSize * bayerSize;
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const idx = (y * width + x) * 4;
 
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        // Get Bayer threshold (normalized to 0-1)
         const bayerValue = bayerMatrix[y % bayerSize][x % bayerSize];
-        const normalizedBayer = (bayerValue / threshold(bayerSize) - 0.5) * 2;
+        const threshold = (bayerValue + 0.5) / matrixSize;
 
-        const offsetR = normalizedBayer * 64 * amount;
-        const offsetG = normalizedBayer * 64 * amount;
-        const offsetB = normalizedBayer * 64 * amount;
+        // Apply ordered dithering: add threshold then quantize
+        // This spreads quantization error in a regular pattern
+        const ditherAmount = (threshold - 0.5) * amount;
+        const rDither = r + ditherAmount * 255;
+        const gDither = g + ditherAmount * 255;
+        const bDither = b + ditherAmount * 255;
 
-        const r = Math.max(0, Math.min(255, data[idx] + offsetR));
-        const g = Math.max(0, Math.min(255, data[idx + 1] + offsetG));
-        const b = Math.max(0, Math.min(255, data[idx + 2] + offsetB));
-
-        const color = findNearestColor(r, g, b, palette, metric);
+        const color = findNearestColor(
+          Math.max(0, Math.min(255, rDither)),
+          Math.max(0, Math.min(255, gDither)),
+          Math.max(0, Math.min(255, bDither)),
+          palette,
+          metric
+        );
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
