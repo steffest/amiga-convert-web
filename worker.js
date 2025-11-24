@@ -184,26 +184,7 @@ function applyCurves(imageData, curvesLUTs) {
 function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamma, curvesLUTs, matteColor) {
   const data = imageData.data;
 
-  // First, composite alpha onto matte color if provided
-  if (matteColor) {
-    const mr = matteColor.r;
-    const mg = matteColor.g;
-    const mb = matteColor.b;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const alpha = data[i + 3] / 255;
-
-      if (alpha < 1) {
-        // Composite: result = source * alpha + matte * (1 - alpha)
-        data[i] = data[i] * alpha + mr * (1 - alpha);
-        data[i + 1] = data[i + 1] * alpha + mg * (1 - alpha);
-        data[i + 2] = data[i + 2] * alpha + mb * (1 - alpha);
-        data[i + 3] = 255; // Set to fully opaque
-      }
-    }
-  }
-
-  // Apply curves after compositing
+  // Apply curves first
   if (curvesLUTs) {
     imageData = applyCurves(imageData, curvesLUTs);
   }
@@ -257,6 +238,26 @@ function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamm
     data[i] = Math.max(0, Math.min(255, r));
     data[i + 1] = Math.max(0, Math.min(255, g));
     data[i + 2] = Math.max(0, Math.min(255, b));
+  }
+
+  // Finally, composite alpha onto matte color AFTER all adjustments
+  // This ensures the matte color stays exact and only source pixels are adjusted
+  if (matteColor) {
+    const mr = matteColor.r;
+    const mg = matteColor.g;
+    const mb = matteColor.b;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3] / 255;
+
+      if (alpha < 1) {
+        // Composite: result = source * alpha + matte * (1 - alpha)
+        data[i] = data[i] * alpha + mr * (1 - alpha);
+        data[i + 1] = data[i + 1] * alpha + mg * (1 - alpha);
+        data[i + 2] = data[i + 2] * alpha + mb * (1 - alpha);
+        data[i + 3] = 255; // Set to fully opaque
+      }
+    }
   }
 
   return imageData;
