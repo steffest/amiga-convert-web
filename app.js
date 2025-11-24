@@ -2866,6 +2866,187 @@ document.getElementById("clearLocksBtn").addEventListener("click", () => {
   }
 });
 
+// Load palette from PNG
+document.getElementById("loadPaletteBtn").addEventListener("click", () => {
+  document.getElementById("paletteInput").click();
+});
+
+document.getElementById("paletteInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  loadPaletteFromPNG(file);
+  e.target.value = ""; // Clear selection
+});
+
+async function loadPaletteFromPNG(file) {
+  try {
+    // Read file as ArrayBuffer for PNG chunk parsing
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    // Validate PNG signature
+    const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+    for (let i = 0; i < pngSignature.length; i++) {
+      if (bytes[i] !== pngSignature[i]) {
+        alert("Invalid PNG file");
+        return;
+      }
+    }
+
+    // Try to extract PLTE chunk (palette for indexed PNGs)
+    const palette = extractPLTEChunk(bytes);
+
+    if (palette && palette.length > 0) {
+      // Indexed PNG - use PLTE palette
+      applyLoadedPalette(palette, `Loaded ${palette.length} colors from indexed PNG palette`);
+    } else {
+      // Non-indexed PNG - scan for unique colors
+      const scannedPalette = await extractUniqueColors(file);
+      if (scannedPalette) {
+        applyLoadedPalette(scannedPalette, `Loaded ${scannedPalette.length} unique colors from image`);
+      }
+    }
+  } catch (error) {
+    console.error("Error loading palette:", error);
+    alert("Error loading palette from PNG");
+  }
+}
+
+function extractPLTEChunk(bytes) {
+  let offset = 8; // Skip PNG signature
+
+  while (offset < bytes.length) {
+    // Read chunk length (4 bytes, big-endian)
+    const length = (bytes[offset] << 24) | (bytes[offset + 1] << 16) |
+                   (bytes[offset + 2] << 8) | bytes[offset + 3];
+    offset += 4;
+
+    // Read chunk type (4 bytes)
+    const type = String.fromCharCode(bytes[offset], bytes[offset + 1],
+                                     bytes[offset + 2], bytes[offset + 3]);
+    offset += 4;
+
+    if (type === "PLTE") {
+      // Found palette chunk - extract RGB triplets
+      const palette = [];
+      const numColors = length / 3;
+
+      for (let i = 0; i < numColors; i++) {
+        const r = bytes[offset + i * 3];
+        const g = bytes[offset + i * 3 + 1];
+        const b = bytes[offset + i * 3 + 2];
+
+        // Quantize to 12-bit (Amiga format)
+        palette.push({
+          r: quantize4bit(r),
+          g: quantize4bit(g),
+          b: quantize4bit(b),
+        });
+      }
+
+      return palette;
+    }
+
+    // Skip chunk data and CRC (4 bytes)
+    offset += length + 4;
+
+    // Stop at IEND chunk
+    if (type === "IEND") break;
+  }
+
+  return null; // No PLTE chunk found
+}
+
+async function extractUniqueColors(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      img.onload = () => {
+        // Draw to temporary canvas
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // Collect unique colors (preserve first-occurrence order)
+        const uniqueColors = [];
+        const colorSet = new Set();
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const a = data[i + 3];
+
+          // Skip fully transparent pixels
+          if (a === 0) continue;
+
+          // Create unique key
+          const key = `${r},${g},${b}`;
+
+          if (!colorSet.has(key)) {
+            colorSet.add(key);
+            uniqueColors.push({
+              r: quantize4bit(r),
+              g: quantize4bit(g),
+              b: quantize4bit(b),
+            });
+          }
+
+          // Stop if too many colors
+          if (uniqueColors.length > 256) {
+            alert("Image has more than 256 unique colors. Please use an image with 256 or fewer colors.");
+            resolve(null);
+            return;
+          }
+        }
+
+        resolve(uniqueColors);
+      };
+
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = e.target.result;
+    };
+
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function applyLoadedPalette(palette, message) {
+  // Clear existing locks
+  lockedColors.clear();
+
+  // Add all palette colors to locked set
+  palette.forEach((color) => {
+    const hexR = color.r.toString(16).padStart(2, "0");
+    const hexG = color.g.toString(16).padStart(2, "0");
+    const hexB = color.b.toString(16).padStart(2, "0");
+    const hexColor = `#${hexR}${hexG}${hexB}`.toUpperCase();
+    lockedColors.add(hexColor);
+  });
+
+  // Update color count to match palette size
+  const colorCount = palette.length;
+  document.getElementById("colors").value = colorCount;
+  document.getElementById("colorsNumber").value = colorCount;
+
+  // Show success message
+  alert(message);
+
+  // Trigger conversion if image is loaded
+  if (window.sourceImage) {
+    convertImage();
+  }
+}
+
 // Close modal on background click
 document.getElementById("addColorModal").addEventListener("click", (e) => {
   if (e.target.id === "addColorModal") {
