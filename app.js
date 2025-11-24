@@ -78,10 +78,22 @@ const curvesEditor = {
 
     // Reset button - resets all curves
     document.getElementById("curvesReset").addEventListener("click", () => {
-      this.curves.rgb = [[0, 0], [255, 255]];
-      this.curves.red = [[0, 0], [255, 255]];
-      this.curves.green = [[0, 0], [255, 255]];
-      this.curves.blue = [[0, 0], [255, 255]];
+      this.curves.rgb = [
+        [0, 0],
+        [255, 255],
+      ];
+      this.curves.red = [
+        [0, 0],
+        [255, 255],
+      ];
+      this.curves.green = [
+        [0, 0],
+        [255, 255],
+      ];
+      this.curves.blue = [
+        [0, 0],
+        [255, 255],
+      ];
       this.selectedPoint = null;
       this.draw();
       convertImage(); // Real-time update
@@ -508,6 +520,102 @@ function quantize4bit(value) {
   return Math.floor(value / 17) * 17;
 }
 
+// Color distance metrics
+function colorDistanceRGB(r1, g1, b1, r2, g2, b2) {
+  const dr = r1 - r2;
+  const dg = g1 - g2;
+  const db = b1 - b2;
+  return dr * dr + dg * dg + db * db;
+}
+
+function colorDistanceWeighted(r1, g1, b1, r2, g2, b2) {
+  const dr = r1 - r2;
+  const dg = g1 - g2;
+  const db = b1 - b2;
+  // Weight green more (human eyes are most sensitive to green)
+  return 0.3 * dr * dr + 0.59 * dg * dg + 0.11 * db * db;
+}
+
+function colorDistanceRedmean(r1, g1, b1, r2, g2, b2) {
+  const dr = r1 - r2;
+  const dg = g1 - g2;
+  const db = b1 - b2;
+  const rmean = (r1 + r2) / 2;
+  // Redmean formula: cheap approximation of perceptual distance
+  return (
+    (2 + rmean / 256) * dr * dr +
+    4 * dg * dg +
+    (2 + (255 - rmean) / 256) * db * db
+  );
+}
+
+function rgbToXYZ(r, g, b) {
+  // Convert to 0-1 range and apply sRGB gamma correction
+  r = r / 255;
+  g = g / 255;
+  b = b / 255;
+
+  r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+  g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+  b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
+  // Convert to XYZ using D65 illuminant
+  const x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
+  const y = r * 0.2126729 + g * 0.7151522 + b * 0.072175;
+  const z = r * 0.0193339 + g * 0.119192 + b * 0.9503041;
+
+  return [x * 100, y * 100, z * 100];
+}
+
+function xyzToLAB(x, y, z) {
+  // D65 illuminant reference white
+  const refX = 95.047;
+  const refY = 100.0;
+  const refZ = 108.883;
+
+  x = x / refX;
+  y = y / refY;
+  z = z / refZ;
+
+  x = x > 0.008856 ? Math.pow(x, 1 / 3) : 7.787 * x + 16 / 116;
+  y = y > 0.008856 ? Math.pow(y, 1 / 3) : 7.787 * y + 16 / 116;
+  z = z > 0.008856 ? Math.pow(z, 1 / 3) : 7.787 * z + 16 / 116;
+
+  const L = 116 * y - 16;
+  const a = 500 * (x - y);
+  const b = 200 * (y - z);
+
+  return [L, a, b];
+}
+
+function colorDistanceLAB(r1, g1, b1, r2, g2, b2) {
+  const [x1, y1, z1] = rgbToXYZ(r1, g1, b1);
+  const [L1, a1, b1_lab] = xyzToLAB(x1, y1, z1);
+
+  const [x2, y2, z2] = rgbToXYZ(r2, g2, b2);
+  const [L2, a2, b2_lab] = xyzToLAB(x2, y2, z2);
+
+  const dL = L1 - L2;
+  const da = a1 - a2;
+  const db = b1_lab - b2_lab;
+
+  return dL * dL + da * da + db * db;
+}
+
+function getColorDistance(r1, g1, b1, r2, g2, b2, metric) {
+  switch (metric) {
+    case "weighted-rgb":
+      return colorDistanceWeighted(r1, g1, b1, r2, g2, b2);
+    case "redmean":
+      return colorDistanceRedmean(r1, g1, b1, r2, g2, b2);
+    case "cie76-lab":
+      return colorDistanceLAB(r1, g1, b1, r2, g2, b2);
+    case "rgb-euclidean":
+    default:
+      return colorDistanceRGB(r1, g1, b1, r2, g2, b2);
+  }
+}
+
 // Apply image adjustments
 // Helper functions for RGB to HSL conversion
 function rgbToHsl(r, g, b) {
@@ -517,7 +625,9 @@ function rgbToHsl(r, g, b) {
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
-  let h, s, l = (max + min) / 2;
+  let h,
+    s,
+    l = (max + min) / 2;
 
   if (max === min) {
     h = s = 0; // achromatic
@@ -526,9 +636,15 @@ function rgbToHsl(r, g, b) {
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
 
     switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / d + 2) / 6; break;
-      case b: h = ((r - g) / d + 4) / 6; break;
+      case r:
+        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        break;
+      case g:
+        h = ((b - r) / d + 2) / 6;
+        break;
+      case b:
+        h = ((r - g) / d + 4) / 6;
+        break;
     }
   }
 
@@ -544,24 +660,31 @@ function hslToRgb(h, s, l) {
     const hue2rgb = (p, q, t) => {
       if (t < 0) t += 1;
       if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
       return p;
     };
 
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
     const p = 2 * l - q;
 
-    r = hue2rgb(p, q, h + 1/3);
+    r = hue2rgb(p, q, h + 1 / 3);
     g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1/3);
+    b = hue2rgb(p, q, h - 1 / 3);
   }
 
   return [r * 255, g * 255, b * 255];
 }
 
-function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamma) {
+function applyAdjustments(
+  imageData,
+  brightness,
+  contrast,
+  saturation,
+  hue,
+  gamma,
+) {
   // Apply curves first if any are modified
   const hasCurves = Object.entries(curvesEditor.curves).some(
     ([channel, curve]) => {
@@ -750,7 +873,7 @@ function medianCut(pixels, colorCount) {
 }
 
 // Wu quantization (simplified - uses median cut)
-function wuQuantization(imageData, colorCount) {
+function wuQuantization(imageData, colorCount, metric = "rgb-euclidean") {
   const data = imageData.data;
   const pixels = [];
 
@@ -768,7 +891,7 @@ function wuQuantization(imageData, colorCount) {
 }
 
 // RGB Quant (popularity + spatial distribution)
-function rgbQuantization(imageData, colorCount) {
+function rgbQuantization(imageData, colorCount, metric = "rgb-euclidean") {
   const data = imageData.data;
   const colorMap = new Map();
 
@@ -817,10 +940,15 @@ function rgbQuantization(imageData, colorCount) {
       // Calculate minimum distance to existing palette
       let minDist = Infinity;
       for (const existing of palette) {
-        const dr = candidate.r - existing.r;
-        const dg = candidate.g - existing.g;
-        const db = candidate.b - existing.b;
-        const dist = dr * dr + dg * dg + db * db;
+        const dist = getColorDistance(
+          candidate.r,
+          candidate.g,
+          candidate.b,
+          existing.r,
+          existing.g,
+          existing.b,
+          metric,
+        );
         minDist = Math.min(minDist, dist);
       }
 
@@ -853,7 +981,7 @@ function seededRandom(seed) {
 }
 
 // NeuQuant (simplified - k-means clustering)
-function neuQuantization(imageData, colorCount) {
+function neuQuantization(imageData, colorCount, metric = "rgb-euclidean") {
   const data = imageData.data;
   const pixels = [];
 
@@ -892,10 +1020,15 @@ function neuQuantization(imageData, colorCount) {
     const distances = pixels.map((pixel) => {
       let minDist = Infinity;
       for (const centroid of centroids) {
-        const dr = pixel.r - centroid.r;
-        const dg = pixel.g - centroid.g;
-        const db = pixel.b - centroid.b;
-        const dist = dr * dr + dg * dg + db * db;
+        const dist = getColorDistance(
+          pixel.r,
+          pixel.g,
+          pixel.b,
+          centroid.r,
+          centroid.g,
+          centroid.b,
+          metric,
+        );
         minDist = Math.min(minDist, dist);
       }
       return minDist;
@@ -929,10 +1062,15 @@ function neuQuantization(imageData, colorCount) {
       let bestIdx = 0;
 
       for (let i = 0; i < centroids.length; i++) {
-        const dr = pixel.r - centroids[i].r;
-        const dg = pixel.g - centroids[i].g;
-        const db = pixel.b - centroids[i].b;
-        const dist = dr * dr + dg * dg + db * db;
+        const dist = getColorDistance(
+          pixel.r,
+          pixel.g,
+          pixel.b,
+          centroids[i].r,
+          centroids[i].g,
+          centroids[i].b,
+          metric,
+        );
 
         if (dist < minDist) {
           minDist = dist;
@@ -986,7 +1124,12 @@ function neuQuantization(imageData, colorCount) {
 }
 
 // Select best locked colors based on image usage
-function selectBestLockedColors(imageData, lockedPalette, colorCount) {
+function selectBestLockedColors(
+  imageData,
+  lockedPalette,
+  colorCount,
+  metric = "rgb-euclidean",
+) {
   const data = imageData.data;
 
   // Count how many pixels would use each locked color
@@ -1003,10 +1146,7 @@ function selectBestLockedColors(imageData, lockedPalette, colorCount) {
 
     for (let j = 0; j < lockedPalette.length; j++) {
       const color = lockedPalette[j];
-      const dr = r - color.r;
-      const dg = g - color.g;
-      const db = b - color.b;
-      const dist = dr * dr + dg * dg + db * db;
+      const dist = getColorDistance(r, g, b, color.r, color.g, color.b, metric);
 
       if (dist < minDist) {
         minDist = dist;
@@ -1026,11 +1166,11 @@ function selectBestLockedColors(imageData, lockedPalette, colorCount) {
   // Sort by usage (descending) and take top N
   colorsWithUsage.sort((a, b) => b.usage - a.usage);
 
-  return colorsWithUsage.slice(0, colorCount).map(item => item.color);
+  return colorsWithUsage.slice(0, colorCount).map((item) => item.color);
 }
 
 // Main palette building function
-function buildPalette(imageData, colorCount, method) {
+function buildPalette(imageData, colorCount, method, metric = "rgb-euclidean") {
   let palette;
 
   // Start with locked colors
@@ -1052,23 +1192,23 @@ function buildPalette(imageData, colorCount, method) {
     return lockedPalette;
   } else if (remainingColors < 0) {
     // More locked colors than requested - pick best ones based on usage
-    return selectBestLockedColors(imageData, lockedPalette, colorCount);
+    return selectBestLockedColors(imageData, lockedPalette, colorCount, metric);
   }
 
   // Generate palette for remaining slots
   switch (method) {
     case "median-cut":
-      palette = wuQuantization(imageData, remainingColors);
+      palette = wuQuantization(imageData, remainingColors, metric);
       break;
     case "wuquant":
-      palette = wuQuantization(imageData, remainingColors);
+      palette = wuQuantization(imageData, remainingColors, metric);
       break;
     case "neuquant":
-      palette = neuQuantization(imageData, remainingColors);
+      palette = neuQuantization(imageData, remainingColors, metric);
       break;
     case "rgbquant":
     default:
-      palette = rgbQuantization(imageData, remainingColors);
+      palette = rgbQuantization(imageData, remainingColors, metric);
       break;
   }
 
@@ -1120,10 +1260,15 @@ function buildPalette(imageData, colorCount, method) {
         let minDist = Infinity;
 
         for (const existing of uniquePalette) {
-          const dr = candidate.r - existing.r;
-          const dg = candidate.g - existing.g;
-          const db = candidate.b - existing.b;
-          const dist = dr * dr + dg * dg + db * db;
+          const dist = getColorDistance(
+            candidate.r,
+            candidate.g,
+            candidate.b,
+            existing.r,
+            existing.g,
+            existing.b,
+            metric,
+          );
           minDist = Math.min(minDist, dist);
         }
 
@@ -1142,15 +1287,12 @@ function buildPalette(imageData, colorCount, method) {
 }
 
 // Find nearest color in palette
-function findNearestColor(r, g, b, palette) {
+function findNearestColor(r, g, b, palette, metric = "rgb-euclidean") {
   let minDist = Infinity;
   let bestColor = palette[0];
 
   for (const color of palette) {
-    const dr = r - color.r;
-    const dg = g - color.g;
-    const db = b - color.b;
-    const dist = dr * dr + dg * dg + db * db;
+    const dist = getColorDistance(r, g, b, color.r, color.g, color.b, metric);
 
     if (dist < minDist) {
       minDist = dist;
@@ -1162,7 +1304,14 @@ function findNearestColor(r, g, b, palette) {
 }
 
 // Dithering algorithms
-function applyDithering(imageData, palette, method, amount, bayerSize) {
+function applyDithering(
+  imageData,
+  palette,
+  method,
+  amount,
+  bayerSize,
+  metric = "rgb-euclidean",
+) {
   const width = imageData.width;
   const height = imageData.height;
   const data = new Int16Array(imageData.data);
@@ -1174,6 +1323,7 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         data[i + 1],
         data[i + 2],
         palette,
+        metric,
       );
       data[i] = color.r;
       data[i + 1] = color.g;
@@ -1188,7 +1338,7 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         const g = Math.max(0, Math.min(255, data[idx + 1]));
         const b = Math.max(0, Math.min(255, data[idx + 2]));
 
-        const color = findNearestColor(r, g, b, palette);
+        const color = findNearestColor(r, g, b, palette, metric);
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1229,7 +1379,7 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         const g = Math.max(0, Math.min(255, data[idx + 1]));
         const b = Math.max(0, Math.min(255, data[idx + 2]));
 
-        const color = findNearestColor(r, g, b, palette);
+        const color = findNearestColor(r, g, b, palette, metric);
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1280,7 +1430,7 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         const g = Math.max(0, Math.min(255, data[idx + 1]));
         const b = Math.max(0, Math.min(255, data[idx + 2]));
 
-        const color = findNearestColor(r, g, b, palette);
+        const color = findNearestColor(r, g, b, palette, metric);
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1362,7 +1512,7 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         const g = Math.max(0, Math.min(255, data[idx + 1]));
         const b = Math.max(0, Math.min(255, data[idx + 2]));
 
-        const color = findNearestColor(r, g, b, palette);
+        const color = findNearestColor(r, g, b, palette, metric);
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1444,7 +1594,7 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         const g = Math.max(0, Math.min(255, data[idx + 1]));
         const b = Math.max(0, Math.min(255, data[idx + 2]));
 
-        const color = findNearestColor(r, g, b, palette);
+        const color = findNearestColor(r, g, b, palette, metric);
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1501,7 +1651,7 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         const g = Math.max(0, Math.min(255, data[idx + 1]));
         const b = Math.max(0, Math.min(255, data[idx + 2]));
 
-        const color = findNearestColor(r, g, b, palette);
+        const color = findNearestColor(r, g, b, palette, metric);
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1573,7 +1723,7 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         const g = Math.max(0, Math.min(255, data[idx + 1]));
         const b = Math.max(0, Math.min(255, data[idx + 2]));
 
-        const color = findNearestColor(r, g, b, palette);
+        const color = findNearestColor(r, g, b, palette, metric);
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1639,7 +1789,7 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         const g = Math.max(0, Math.min(255, data[idx + 1] + threshold));
         const b = Math.max(0, Math.min(255, data[idx + 2] + threshold));
 
-        const color = findNearestColor(r, g, b, palette);
+        const color = findNearestColor(r, g, b, palette, metric);
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1858,12 +2008,12 @@ function displayPalette(palette) {
 
   // Display locked colors that are not in the active palette (disabled state)
   const paletteColorSet = new Set(
-    palette.map(c => {
+    palette.map((c) => {
       const hexR = c.r.toString(16).padStart(2, "0");
       const hexG = c.g.toString(16).padStart(2, "0");
       const hexB = c.b.toString(16).padStart(2, "0");
       return `#${hexR}${hexG}${hexB}`.toUpperCase();
-    })
+    }),
   );
 
   lockedColors.forEach((hexColor) => {
@@ -1972,7 +2122,13 @@ async function convertImage() {
     // Build palette
     const colorCount = parseInt(document.getElementById("colors").value);
     const quantMethod = document.getElementById("quantMethod").value;
-    const palette = buildPalette(imageData, colorCount, quantMethod);
+    const colorDistance = document.getElementById("colorDistance").value;
+    const palette = buildPalette(
+      imageData,
+      colorCount,
+      quantMethod,
+      colorDistance,
+    );
 
     // Apply dithering
     const ditherMethod = document.getElementById("ditherMethod").value;
@@ -1987,6 +2143,7 @@ async function convertImage() {
       ditherMethod,
       ditherAmount,
       bayerSize,
+      colorDistance,
     );
 
     // Draw results to all canvases
@@ -2211,6 +2368,13 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("gamma").value = 1;
   document.getElementById("gammaNumber").value = 1;
 
+  // Reset conversion controls to default values
+  document.getElementById("colors").value = 32;
+  document.getElementById("colorsNumber").value = 32;
+  document.getElementById("ditherAmount").value = 0.5;
+  document.getElementById("ditherAmountNumber").value = 0.5;
+  document.getElementById("colorDistance").value = "rgb-euclidean";
+
   // Reset window state
   window.sourceImage = null;
 });
@@ -2249,7 +2413,7 @@ function debouncedConvertImage() {
   clearTimeout(conversionTimeout);
   conversionTimeout = setTimeout(() => {
     convertImage();
-  }, 20); // ms delay
+  }, 300); // ms delay
 }
 
 // Trigger conversion on any control change
@@ -2278,7 +2442,12 @@ const continuousControls = [
 ];
 
 // Discrete controls (dropdowns) convert immediately
-const discreteControls = ["quantMethod", "ditherMethod", "bayerSize"];
+const discreteControls = [
+  "quantMethod",
+  "ditherMethod",
+  "bayerSize",
+  "colorDistance",
+];
 
 continuousControls.forEach((id) => {
   const element = document.getElementById(id);
@@ -2991,12 +3160,18 @@ async function loadPaletteFromPNG(file) {
 
     if (palette && palette.length > 0) {
       // Indexed PNG - use PLTE palette
-      applyLoadedPalette(palette, `Loaded ${palette.length} colors from indexed PNG palette`);
+      applyLoadedPalette(
+        palette,
+        `Loaded ${palette.length} colors from indexed PNG palette`,
+      );
     } else {
       // Non-indexed PNG - scan for unique colors
       const scannedPalette = await extractUniqueColors(file);
       if (scannedPalette) {
-        applyLoadedPalette(scannedPalette, `Loaded ${scannedPalette.length} unique colors from image`);
+        applyLoadedPalette(
+          scannedPalette,
+          `Loaded ${scannedPalette.length} unique colors from image`,
+        );
       }
     }
   } catch (error) {
@@ -3010,13 +3185,20 @@ function extractPLTEChunk(bytes) {
 
   while (offset < bytes.length) {
     // Read chunk length (4 bytes, big-endian)
-    const length = (bytes[offset] << 24) | (bytes[offset + 1] << 16) |
-                   (bytes[offset + 2] << 8) | bytes[offset + 3];
+    const length =
+      (bytes[offset] << 24) |
+      (bytes[offset + 1] << 16) |
+      (bytes[offset + 2] << 8) |
+      bytes[offset + 3];
     offset += 4;
 
     // Read chunk type (4 bytes)
-    const type = String.fromCharCode(bytes[offset], bytes[offset + 1],
-                                     bytes[offset + 2], bytes[offset + 3]);
+    const type = String.fromCharCode(
+      bytes[offset],
+      bytes[offset + 1],
+      bytes[offset + 2],
+      bytes[offset + 3],
+    );
     offset += 4;
 
     if (type === "PLTE") {
@@ -3094,7 +3276,9 @@ async function extractUniqueColors(file) {
 
           // Stop if too many colors
           if (uniqueColors.length > 256) {
-            alert("Image has more than 256 unique colors. Please use an image with 256 or fewer colors.");
+            alert(
+              "Image has more than 256 unique colors. Please use an image with 256 or fewer colors.",
+            );
             resolve(null);
             return;
           }

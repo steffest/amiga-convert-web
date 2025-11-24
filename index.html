@@ -92,6 +92,17 @@
                 <option value="8" selected>8x8</option>
               </select>
             </div>
+            <div class="control-item">
+              <label for="colorDistance">Color Distance</label>
+              <select id="colorDistance">
+                <option value="rgb-euclidean" selected>
+                  RGB Euclidean (fast)
+                </option>
+                <option value="weighted-rgb">Weighted RGB (fast)</option>
+                <option value="redmean">Redmean (perceptual)</option>
+                <option value="cie76-lab">CIE76 LAB (accurate)</option>
+              </select>
+            </div>
           </div>
 
           <div class="control-group">
