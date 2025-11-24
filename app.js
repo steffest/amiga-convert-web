@@ -230,11 +230,12 @@ const curvesEditor = {
     this.selectedPoint = this.draggingPoint; // Keep selection in sync
 
     this.draw();
-    convertImage(); // Real-time update
+    throttledConvertImage(); // Throttled updates during dragging
   },
 
   onMouseUp() {
     this.draggingPoint = null;
+    convertImage(); // Final update when released
   },
 
   onDoubleClick(e) {
@@ -512,6 +513,15 @@ const curvesEditor = {
     }
 
     return imageData;
+  },
+
+  getCurvesLUTs() {
+    return {
+      rgb: this.interpolateCurve(this.curves.rgb),
+      red: this.interpolateCurve(this.curves.red),
+      green: this.interpolateCurve(this.curves.green),
+      blue: this.interpolateCurve(this.curves.blue),
+    };
   },
 };
 
@@ -2069,7 +2079,6 @@ async function convertImage() {
     const ctx = originalCanvas.getContext("2d", {
       willReadFrequently: true,
     });
-    const previewCtx = previewCanvas.getContext("2d");
 
     // Get resize dimensions (will auto-detect if different from original)
     const resizeWidth = parseInt(document.getElementById("resizeWidth").value);
@@ -2087,15 +2096,17 @@ async function convertImage() {
         ? resizeHeight
         : window.sourceImage.height;
 
-    // Set canvas sizes
-    originalCanvas.width = width;
-    originalCanvas.height = height;
-    previewCanvas.width = width;
-    previewCanvas.height = height;
-    slideOriginalCanvas.width = width;
-    slideOriginalCanvas.height = height;
-    slidePreviewCanvas.width = width;
-    slidePreviewCanvas.height = height;
+    // Only set canvas sizes if they've changed (setting dimensions clears the canvas)
+    if (originalCanvas.width !== width || originalCanvas.height !== height) {
+      originalCanvas.width = width;
+      originalCanvas.height = height;
+      previewCanvas.width = width;
+      previewCanvas.height = height;
+      slideOriginalCanvas.width = width;
+      slideOriginalCanvas.height = height;
+      slidePreviewCanvas.width = width;
+      slidePreviewCanvas.height = height;
+    }
 
     // Draw original to main canvas (resized if enabled)
     ctx.drawImage(window.sourceImage, 0, 0, width, height);
@@ -2104,65 +2115,40 @@ async function convertImage() {
     let imageData = ctx.getImageData(0, 0, width, height);
     curvesEditor.calculateHistogram(imageData);
 
-    const brightness = parseInt(document.getElementById("brightness").value);
-    const contrast = parseInt(document.getElementById("contrast").value);
-    const saturation = parseInt(document.getElementById("saturation").value);
-    const hue = parseInt(document.getElementById("hue").value);
-    const gamma = parseFloat(document.getElementById("gamma").value);
-
-    imageData = applyAdjustments(
-      imageData,
-      brightness,
-      contrast,
-      saturation,
-      hue,
-      gamma,
-    );
-
-    // Build palette
-    const colorCount = parseInt(document.getElementById("colors").value);
-    const quantMethod = document.getElementById("quantMethod").value;
-    const colorDistance = document.getElementById("colorDistance").value;
-    const palette = buildPalette(
-      imageData,
-      colorCount,
-      quantMethod,
-      colorDistance,
-    );
-
-    // Apply dithering
-    const ditherMethod = document.getElementById("ditherMethod").value;
-    const ditherAmount = parseFloat(
-      document.getElementById("ditherAmount").value,
-    );
-    const bayerSize = parseInt(document.getElementById("bayerSize").value);
-
-    imageData = applyDithering(
-      imageData,
-      palette,
-      ditherMethod,
-      ditherAmount,
-      bayerSize,
-      colorDistance,
-    );
-
-    // Draw results to all canvases
-    previewCtx.putImageData(imageData, 0, 0);
-
-    // Draw to slide reveal canvases
+    // Draw original to slide canvas
     const slideOriginalCtx = slideOriginalCanvas.getContext("2d");
-    const slidePreviewCtx = slidePreviewCanvas.getContext("2d");
-    slidePreviewCtx.putImageData(imageData, 0, 0);
     slideOriginalCtx.drawImage(window.sourceImage, 0, 0, width, height);
 
-    // Display palette
-    displayPalette(palette);
+    // Increment conversion ID to track this conversion
+    currentConversionId++;
+    const thisConversionId = currentConversionId;
 
-    // Update view mode
-    updateViewMode();
+    // Gather all parameters
+    const params = {
+      brightness: parseInt(document.getElementById("brightness").value),
+      contrast: parseInt(document.getElementById("contrast").value),
+      saturation: parseInt(document.getElementById("saturation").value),
+      hue: parseInt(document.getElementById("hue").value),
+      gamma: parseFloat(document.getElementById("gamma").value),
+      curvesLUTs: curvesEditor.getCurvesLUTs(),
+      colorCount: parseInt(document.getElementById("colors").value),
+      quantMethod: document.getElementById("quantMethod").value,
+      colorDistance: document.getElementById("colorDistance").value,
+      lockedColors: Array.from(lockedColors),
+      ditherMethod: document.getElementById("ditherMethod").value,
+      ditherAmount: parseFloat(document.getElementById("ditherAmount").value),
+      bayerSize: parseInt(document.getElementById("bayerSize").value),
+    };
 
-    // Enable download
-    document.getElementById("downloadBtn").disabled = false;
+    // Send to worker for processing (copy data, don't transfer)
+    // This keeps the original preview visible while processing
+    conversionWorker.postMessage({
+      id: thisConversionId,
+      imageData: imageData.data.slice(0), // Copy the array
+      width: width,
+      height: height,
+      params: params,
+    });
   }, 10);
 }
 
@@ -2407,13 +2393,25 @@ document.getElementById("ditherMethod").addEventListener("change", (e) => {
   bayerControl.style.display = e.target.value === "ordered" ? "block" : "none";
 });
 
-// Debounce function for performance
+// Throttle function - ensures updates happen DURING dragging, not just after
 let conversionTimeout;
-function debouncedConvertImage() {
-  clearTimeout(conversionTimeout);
-  conversionTimeout = setTimeout(() => {
+let lastConversionTime = 0;
+function throttledConvertImage() {
+  const now = Date.now();
+  const timeSinceLastConversion = now - lastConversionTime;
+
+  // If enough time has passed, convert immediately
+  if (timeSinceLastConversion >= 100) {
+    lastConversionTime = now;
     convertImage();
-  }, 300); // ms delay
+  } else {
+    // Otherwise, schedule for the remaining time
+    clearTimeout(conversionTimeout);
+    conversionTimeout = setTimeout(() => {
+      lastConversionTime = Date.now();
+      convertImage();
+    }, 100 - timeSinceLastConversion);
+  }
 }
 
 // Trigger conversion on any control change
@@ -2451,7 +2449,7 @@ const discreteControls = [
 
 continuousControls.forEach((id) => {
   const element = document.getElementById(id);
-  element.addEventListener("input", debouncedConvertImage); // Debounced while dragging
+  element.addEventListener("input", throttledConvertImage); // Throttled updates during dragging
   element.addEventListener("change", convertImage); // Immediate on release
 });
 
@@ -3392,3 +3390,60 @@ document.getElementById("aspectRatioLock").addEventListener("change", (e) => {
     }
   }
 });
+
+// Web Worker setup for non-blocking image processing
+let conversionWorker = null;
+let currentConversionId = 0;
+
+function initWorker() {
+  if (conversionWorker) return;
+
+  conversionWorker = new Worker("worker.js");
+
+  conversionWorker.addEventListener("message", function (e) {
+    const { id, imageData, palette, success, error } = e.data;
+
+    // Ignore stale results
+    if (id !== currentConversionId) {
+      return;
+    }
+
+    if (!success) {
+      console.error("Worker error:", error);
+      return;
+    }
+
+    // Get canvases
+    const previewCanvas = document.getElementById("previewCanvas");
+    const slidePreviewCanvas = document.getElementById("slidePreviewCanvas");
+
+    // Create ImageData and draw to canvases
+    const processedImageData = new ImageData(
+      new Uint8ClampedArray(imageData),
+      previewCanvas.width,
+      previewCanvas.height,
+    );
+
+    const previewCtx = previewCanvas.getContext("2d");
+    previewCtx.putImageData(processedImageData, 0, 0);
+
+    const slidePreviewCtx = slidePreviewCanvas.getContext("2d");
+    slidePreviewCtx.putImageData(processedImageData, 0, 0);
+
+    // Display palette
+    displayPalette(palette);
+
+    // Update view mode
+    updateViewMode();
+
+    // Enable download
+    document.getElementById("downloadBtn").disabled = false;
+  });
+
+  conversionWorker.addEventListener("error", function (e) {
+    console.error("Worker error:", e);
+  });
+}
+
+// Initialize worker on page load
+initWorker();
