@@ -2368,7 +2368,13 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("colorsNumber").value = 32;
   document.getElementById("ditherAmount").value = 0.5;
   document.getElementById("ditherAmountNumber").value = 0.5;
+  document.getElementById("ditherMethod").value = "floyd-steinberg";
+  document.getElementById("quantMethod").value = "rgbquant";
   document.getElementById("colorDistance").value = "rgb-euclidean";
+
+  // Set initial visibility for conditional controls
+  document.getElementById("bayerSizeControl").style.display = "none";
+  document.getElementById("ditherAmountControl").style.display = "block";
 
   // Reset window state
   window.sourceImage = null;

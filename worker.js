@@ -794,35 +794,44 @@ function applyDithering(imageData, palette, method, amount, bayerSize, metric) {
       data[i + 2] = color.b;
     }
   } else if (method === "ordered") {
-    const bayerMatrix = generateBayerMatrix(bayerSize);
-    const matrixSize = bayerSize * bayerSize;
+    const bayer2 = [
+      [0, 2],
+      [3, 1],
+    ];
+    const bayer4 = [
+      [0, 8, 2, 10],
+      [12, 4, 14, 6],
+      [3, 11, 1, 9],
+      [15, 7, 13, 5],
+    ];
+    const bayer8 = [
+      [0, 32, 8, 40, 2, 34, 10, 42],
+      [48, 16, 56, 24, 50, 18, 58, 26],
+      [12, 44, 4, 36, 14, 46, 6, 38],
+      [60, 28, 52, 20, 62, 30, 54, 22],
+      [3, 35, 11, 43, 1, 33, 9, 41],
+      [51, 19, 59, 27, 49, 17, 57, 25],
+      [15, 47, 7, 39, 13, 45, 5, 37],
+      [63, 31, 55, 23, 61, 29, 53, 21],
+    ];
+
+    const matrices = { 2: bayer2, 4: bayer4, 8: bayer8 };
+    const matrix = matrices[bayerSize] || bayer8;
+    const matrixMax = bayerSize * bayerSize;
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const idx = (y * width + x) * 4;
+        const threshold =
+          (matrix[y % bayerSize][x % bayerSize] / matrixMax - 0.5) *
+          64 *
+          amount;
 
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
+        const r = Math.max(0, Math.min(255, data[idx] + threshold));
+        const g = Math.max(0, Math.min(255, data[idx + 1] + threshold));
+        const b = Math.max(0, Math.min(255, data[idx + 2] + threshold));
 
-        // Get Bayer threshold (normalized to 0-1)
-        const bayerValue = bayerMatrix[y % bayerSize][x % bayerSize];
-        const threshold = (bayerValue + 0.5) / matrixSize;
-
-        // Apply ordered dithering: add threshold then quantize
-        // This spreads quantization error in a regular pattern
-        const ditherAmount = (threshold - 0.5) * amount;
-        const rDither = r + ditherAmount * 255;
-        const gDither = g + ditherAmount * 255;
-        const bDither = b + ditherAmount * 255;
-
-        const color = findNearestColor(
-          Math.max(0, Math.min(255, rDither)),
-          Math.max(0, Math.min(255, gDither)),
-          Math.max(0, Math.min(255, bDither)),
-          palette,
-          metric
-        );
+        const color = findNearestColor(r, g, b, palette, metric);
 
         data[idx] = color.r;
         data[idx + 1] = color.g;
