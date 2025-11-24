@@ -985,6 +985,50 @@ function neuQuantization(imageData, colorCount) {
   }));
 }
 
+// Select best locked colors based on image usage
+function selectBestLockedColors(imageData, lockedPalette, colorCount) {
+  const data = imageData.data;
+
+  // Count how many pixels would use each locked color
+  const colorUsage = lockedPalette.map(() => 0);
+
+  // For each pixel, find closest locked color and increment its count
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    let minDist = Infinity;
+    let closestIdx = 0;
+
+    for (let j = 0; j < lockedPalette.length; j++) {
+      const color = lockedPalette[j];
+      const dr = r - color.r;
+      const dg = g - color.g;
+      const db = b - color.b;
+      const dist = dr * dr + dg * dg + db * db;
+
+      if (dist < minDist) {
+        minDist = dist;
+        closestIdx = j;
+      }
+    }
+
+    colorUsage[closestIdx]++;
+  }
+
+  // Create array of colors with their usage counts
+  const colorsWithUsage = lockedPalette.map((color, idx) => ({
+    color,
+    usage: colorUsage[idx],
+  }));
+
+  // Sort by usage (descending) and take top N
+  colorsWithUsage.sort((a, b) => b.usage - a.usage);
+
+  return colorsWithUsage.slice(0, colorCount).map(item => item.color);
+}
+
 // Main palette building function
 function buildPalette(imageData, colorCount, method) {
   let palette;
@@ -1003,9 +1047,12 @@ function buildPalette(imageData, colorCount, method) {
 
   const remainingColors = colorCount - lockedPalette.length;
 
-  if (remainingColors <= 0) {
-    // Only use locked colors if we have enough
-    return lockedPalette.slice(0, colorCount);
+  if (remainingColors === 0) {
+    // Exactly enough locked colors - use them in original order
+    return lockedPalette;
+  } else if (remainingColors < 0) {
+    // More locked colors than requested - pick best ones based on usage
+    return selectBestLockedColors(imageData, lockedPalette, colorCount);
   }
 
   // Generate palette for remaining slots
@@ -1808,6 +1855,51 @@ function displayPalette(palette) {
 
     paletteDisplay.appendChild(colorDiv);
   }
+
+  // Display locked colors that are not in the active palette (disabled state)
+  const paletteColorSet = new Set(
+    palette.map(c => {
+      const hexR = c.r.toString(16).padStart(2, "0");
+      const hexG = c.g.toString(16).padStart(2, "0");
+      const hexB = c.b.toString(16).padStart(2, "0");
+      return `#${hexR}${hexG}${hexB}`.toUpperCase();
+    })
+  );
+
+  lockedColors.forEach((hexColor) => {
+    // Skip if already in palette
+    if (paletteColorSet.has(hexColor)) return;
+
+    // This is a locked color not in the active palette - show as disabled
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+
+    const colorDiv = document.createElement("div");
+    colorDiv.className = "palette-color locked disabled";
+    colorDiv.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+
+    // Convert to 12-bit format for tooltip
+    const r4bit = Math.floor(r / 17).toString(16);
+    const g4bit = Math.floor(g / 17).toString(16);
+    const b4bit = Math.floor(b / 17).toString(16);
+    const hex12bit = `#${r4bit}${g4bit}${b4bit}`.toUpperCase();
+
+    const tooltipText = `${hex12bit} • Not used (exceeds color count)`;
+    colorDiv.setAttribute("data-rgb", tooltipText);
+    colorDiv.setAttribute("data-rgb-full", hexColor);
+
+    // Click to unlock (removing from locked set)
+    colorDiv.addEventListener("click", (e) => {
+      e.stopPropagation();
+      lockedColors.delete(hexColor);
+      if (window.sourceImage) {
+        convertImage();
+      }
+    });
+
+    paletteDisplay.appendChild(colorDiv);
+  });
 }
 
 // Main conversion function

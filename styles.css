@@ -535,6 +535,12 @@
           border-style: dashed;
       }
 
+      .palette-color.disabled {
+          opacity: 0.4;
+          border: 1px dashed #606060;
+          cursor: not-allowed;
+      }
+
       .palette-color.highlighted {
           border: 2px solid #ffff00;
           box-shadow: 0 0 8px rgba(255, 255, 0, 0.6);
