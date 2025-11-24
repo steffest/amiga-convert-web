@@ -2495,6 +2495,33 @@ setupSliderNumberSync("gamma", "gammaNumber");
 setupSliderNumberSync("colors", "colorsNumber");
 setupSliderNumberSync("ditherAmount", "ditherAmountNumber");
 
+// Double-click to reset sliders to default values
+const sliderDefaults = {
+  brightness: 0,
+  contrast: 0,
+  saturation: 0,
+  hue: 0,
+  gamma: 1,
+  colors: 32,
+  ditherAmount: 0.5,
+};
+
+Object.entries(sliderDefaults).forEach(([sliderId, defaultValue]) => {
+  const slider = document.getElementById(sliderId);
+  const numberId = sliderId + "Number";
+  const number = document.getElementById(numberId);
+
+  if (slider) {
+    slider.addEventListener("dblclick", () => {
+      slider.value = defaultValue;
+      if (number) {
+        number.value = defaultValue;
+      }
+      slider.dispatchEvent(new Event("input"));
+    });
+  }
+});
+
 // Track mouse on preview canvas to highlight palette color
 document.getElementById("previewCanvas").addEventListener("mousemove", (e) => {
   const canvas = document.getElementById("previewCanvas");
@@ -2816,6 +2843,20 @@ function addCustomColor() {
     alert("Please enter a valid hex color (e.g., #F03 or #FF0033)");
   }
 }
+
+// Lock all button
+document.getElementById("lockAllBtn").addEventListener("click", () => {
+  currentPalette.forEach((color) => {
+    const hexR = color.r.toString(16).padStart(2, "0");
+    const hexG = color.g.toString(16).padStart(2, "0");
+    const hexB = color.b.toString(16).padStart(2, "0");
+    const hexColor = `#${hexR}${hexG}${hexB}`.toUpperCase();
+    lockedColors.add(hexColor);
+  });
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
 
 // Clear locks button
 document.getElementById("clearLocksBtn").addEventListener("click", () => {
