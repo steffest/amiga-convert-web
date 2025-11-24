@@ -76,12 +76,13 @@ const curvesEditor = {
       });
     });
 
-    // Reset button
+    // Reset button - resets all curves
     document.getElementById("curvesReset").addEventListener("click", () => {
-      this.curves[this.currentChannel] = [
-        [0, 0],
-        [255, 255],
-      ];
+      this.curves.rgb = [[0, 0], [255, 255]];
+      this.curves.red = [[0, 0], [255, 255]];
+      this.curves.green = [[0, 0], [255, 255]];
+      this.curves.blue = [[0, 0], [255, 255]];
+      this.selectedPoint = null;
       this.draw();
       convertImage(); // Real-time update
     });
@@ -394,6 +395,56 @@ const curvesEditor = {
     ctx.stroke();
     ctx.setLineDash([]);
 
+    // When in RGB mode, draw the R, G, B curves in the background
+    if (this.currentChannel === "rgb") {
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 1.5;
+
+      // Draw red curve
+      const redLut = this.interpolateCurve(this.curves.red);
+      ctx.strokeStyle = "#ff4a4a";
+      ctx.beginPath();
+      for (let i = 0; i < 256; i++) {
+        const pos = this.valueToCanvas(i, redLut[i]);
+        if (i === 0) {
+          ctx.moveTo(pos.x, pos.y);
+        } else {
+          ctx.lineTo(pos.x, pos.y);
+        }
+      }
+      ctx.stroke();
+
+      // Draw green curve
+      const greenLut = this.interpolateCurve(this.curves.green);
+      ctx.strokeStyle = "#4aff4a";
+      ctx.beginPath();
+      for (let i = 0; i < 256; i++) {
+        const pos = this.valueToCanvas(i, greenLut[i]);
+        if (i === 0) {
+          ctx.moveTo(pos.x, pos.y);
+        } else {
+          ctx.lineTo(pos.x, pos.y);
+        }
+      }
+      ctx.stroke();
+
+      // Draw blue curve
+      const blueLut = this.interpolateCurve(this.curves.blue);
+      ctx.strokeStyle = "#4a9eff";
+      ctx.beginPath();
+      for (let i = 0; i < 256; i++) {
+        const pos = this.valueToCanvas(i, blueLut[i]);
+        if (i === 0) {
+          ctx.moveTo(pos.x, pos.y);
+        } else {
+          ctx.lineTo(pos.x, pos.y);
+        }
+      }
+      ctx.stroke();
+
+      ctx.globalAlpha = 1;
+    }
+
     // Draw curve
     const curve = this.curves[this.currentChannel];
     const lut = this.interpolateCurve(curve);
@@ -458,7 +509,59 @@ function quantize4bit(value) {
 }
 
 // Apply image adjustments
-function applyAdjustments(imageData, brightness, contrast, saturation, gamma) {
+// Helper functions for RGB to HSL conversion
+function rgbToHsl(r, g, b) {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+
+  if (max === min) {
+    h = s = 0; // achromatic
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+
+  return [h, s, l];
+}
+
+function hslToRgb(h, s, l) {
+  let r, g, b;
+
+  if (s === 0) {
+    r = g = b = l; // achromatic
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+
+  return [r * 255, g * 255, b * 255];
+}
+
+function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamma) {
   // Apply curves first if any are modified
   const hasCurves = Object.entries(curvesEditor.curves).some(
     ([channel, curve]) => {
@@ -506,6 +609,23 @@ function applyAdjustments(imageData, brightness, contrast, saturation, gamma) {
     r = gray + (r - gray) * saturationFactor;
     g = gray + (g - gray) * saturationFactor;
     b = gray + (b - gray) * saturationFactor;
+
+    // Hue shift
+    if (hue !== 0) {
+      // Clamp before converting to HSL
+      r = Math.max(0, Math.min(255, r));
+      g = Math.max(0, Math.min(255, g));
+      b = Math.max(0, Math.min(255, b));
+
+      let [h, s, l] = rgbToHsl(r, g, b);
+      h += hue / 360; // Convert degrees to 0-1 range
+
+      // Wrap hue around
+      if (h > 1) h -= 1;
+      if (h < 0) h += 1;
+
+      [r, g, b] = hslToRgb(h, s, l);
+    }
 
     // Gamma
     r = Math.pow(r / 255, 1 / gamma) * 255;
@@ -1104,6 +1224,336 @@ function applyDithering(imageData, palette, method, amount, bayerSize) {
         }
       }
     }
+  } else if (method === "jarvis-judice-ninke") {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+
+        const r = Math.max(0, Math.min(255, data[idx]));
+        const g = Math.max(0, Math.min(255, data[idx + 1]));
+        const b = Math.max(0, Math.min(255, data[idx + 2]));
+
+        const color = findNearestColor(r, g, b, palette);
+
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+
+        const errR = (r - color.r) * amount;
+        const errG = (g - color.g) * amount;
+        const errB = (b - color.b) * amount;
+
+        // JJN distributes error to 12 neighbors with weights summing to 48
+        if (x + 1 < width) {
+          data[idx + 4] += (errR * 7) / 48;
+          data[idx + 5] += (errG * 7) / 48;
+          data[idx + 6] += (errB * 7) / 48;
+        }
+        if (x + 2 < width) {
+          data[idx + 8] += (errR * 5) / 48;
+          data[idx + 9] += (errG * 5) / 48;
+          data[idx + 10] += (errB * 5) / 48;
+        }
+        if (y + 1 < height) {
+          if (x > 1) {
+            data[idx - 8 + width * 4] += (errR * 3) / 48;
+            data[idx - 7 + width * 4] += (errG * 3) / 48;
+            data[idx - 6 + width * 4] += (errB * 3) / 48;
+          }
+          if (x > 0) {
+            data[idx - 4 + width * 4] += (errR * 5) / 48;
+            data[idx - 3 + width * 4] += (errG * 5) / 48;
+            data[idx - 2 + width * 4] += (errB * 5) / 48;
+          }
+          data[idx + width * 4] += (errR * 7) / 48;
+          data[idx + 1 + width * 4] += (errG * 7) / 48;
+          data[idx + 2 + width * 4] += (errB * 7) / 48;
+          if (x + 1 < width) {
+            data[idx + 4 + width * 4] += (errR * 5) / 48;
+            data[idx + 5 + width * 4] += (errG * 5) / 48;
+            data[idx + 6 + width * 4] += (errB * 5) / 48;
+          }
+          if (x + 2 < width) {
+            data[idx + 8 + width * 4] += (errR * 3) / 48;
+            data[idx + 9 + width * 4] += (errG * 3) / 48;
+            data[idx + 10 + width * 4] += (errB * 3) / 48;
+          }
+        }
+        if (y + 2 < height) {
+          if (x > 1) {
+            data[idx - 8 + width * 8] += (errR * 1) / 48;
+            data[idx - 7 + width * 8] += (errG * 1) / 48;
+            data[idx - 6 + width * 8] += (errB * 1) / 48;
+          }
+          if (x > 0) {
+            data[idx - 4 + width * 8] += (errR * 3) / 48;
+            data[idx - 3 + width * 8] += (errG * 3) / 48;
+            data[idx - 2 + width * 8] += (errB * 3) / 48;
+          }
+          data[idx + width * 8] += (errR * 5) / 48;
+          data[idx + 1 + width * 8] += (errG * 5) / 48;
+          data[idx + 2 + width * 8] += (errB * 5) / 48;
+          if (x + 1 < width) {
+            data[idx + 4 + width * 8] += (errR * 3) / 48;
+            data[idx + 5 + width * 8] += (errG * 3) / 48;
+            data[idx + 6 + width * 8] += (errB * 3) / 48;
+          }
+          if (x + 2 < width) {
+            data[idx + 8 + width * 8] += (errR * 1) / 48;
+            data[idx + 9 + width * 8] += (errG * 1) / 48;
+            data[idx + 10 + width * 8] += (errB * 1) / 48;
+          }
+        }
+      }
+    }
+  } else if (method === "stucki") {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+
+        const r = Math.max(0, Math.min(255, data[idx]));
+        const g = Math.max(0, Math.min(255, data[idx + 1]));
+        const b = Math.max(0, Math.min(255, data[idx + 2]));
+
+        const color = findNearestColor(r, g, b, palette);
+
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+
+        const errR = (r - color.r) * amount;
+        const errG = (g - color.g) * amount;
+        const errB = (b - color.b) * amount;
+
+        // Stucki distributes error to 12 neighbors with weights summing to 42
+        if (x + 1 < width) {
+          data[idx + 4] += (errR * 8) / 42;
+          data[idx + 5] += (errG * 8) / 42;
+          data[idx + 6] += (errB * 8) / 42;
+        }
+        if (x + 2 < width) {
+          data[idx + 8] += (errR * 4) / 42;
+          data[idx + 9] += (errG * 4) / 42;
+          data[idx + 10] += (errB * 4) / 42;
+        }
+        if (y + 1 < height) {
+          if (x > 1) {
+            data[idx - 8 + width * 4] += (errR * 2) / 42;
+            data[idx - 7 + width * 4] += (errG * 2) / 42;
+            data[idx - 6 + width * 4] += (errB * 2) / 42;
+          }
+          if (x > 0) {
+            data[idx - 4 + width * 4] += (errR * 4) / 42;
+            data[idx - 3 + width * 4] += (errG * 4) / 42;
+            data[idx - 2 + width * 4] += (errB * 4) / 42;
+          }
+          data[idx + width * 4] += (errR * 8) / 42;
+          data[idx + 1 + width * 4] += (errG * 8) / 42;
+          data[idx + 2 + width * 4] += (errB * 8) / 42;
+          if (x + 1 < width) {
+            data[idx + 4 + width * 4] += (errR * 4) / 42;
+            data[idx + 5 + width * 4] += (errG * 4) / 42;
+            data[idx + 6 + width * 4] += (errB * 4) / 42;
+          }
+          if (x + 2 < width) {
+            data[idx + 8 + width * 4] += (errR * 2) / 42;
+            data[idx + 9 + width * 4] += (errG * 2) / 42;
+            data[idx + 10 + width * 4] += (errB * 2) / 42;
+          }
+        }
+        if (y + 2 < height) {
+          if (x > 1) {
+            data[idx - 8 + width * 8] += (errR * 1) / 42;
+            data[idx - 7 + width * 8] += (errG * 1) / 42;
+            data[idx - 6 + width * 8] += (errB * 1) / 42;
+          }
+          if (x > 0) {
+            data[idx - 4 + width * 8] += (errR * 2) / 42;
+            data[idx - 3 + width * 8] += (errG * 2) / 42;
+            data[idx - 2 + width * 8] += (errB * 2) / 42;
+          }
+          data[idx + width * 8] += (errR * 4) / 42;
+          data[idx + 1 + width * 8] += (errG * 4) / 42;
+          data[idx + 2 + width * 8] += (errB * 4) / 42;
+          if (x + 1 < width) {
+            data[idx + 4 + width * 8] += (errR * 2) / 42;
+            data[idx + 5 + width * 8] += (errG * 2) / 42;
+            data[idx + 6 + width * 8] += (errB * 2) / 42;
+          }
+          if (x + 2 < width) {
+            data[idx + 8 + width * 8] += (errR * 1) / 42;
+            data[idx + 9 + width * 8] += (errG * 1) / 42;
+            data[idx + 10 + width * 8] += (errB * 1) / 42;
+          }
+        }
+      }
+    }
+  } else if (method === "burkes") {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+
+        const r = Math.max(0, Math.min(255, data[idx]));
+        const g = Math.max(0, Math.min(255, data[idx + 1]));
+        const b = Math.max(0, Math.min(255, data[idx + 2]));
+
+        const color = findNearestColor(r, g, b, palette);
+
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+
+        const errR = (r - color.r) * amount;
+        const errG = (g - color.g) * amount;
+        const errB = (b - color.b) * amount;
+
+        // Burkes distributes error to 7 neighbors with weights summing to 32
+        if (x + 1 < width) {
+          data[idx + 4] += (errR * 8) / 32;
+          data[idx + 5] += (errG * 8) / 32;
+          data[idx + 6] += (errB * 8) / 32;
+        }
+        if (x + 2 < width) {
+          data[idx + 8] += (errR * 4) / 32;
+          data[idx + 9] += (errG * 4) / 32;
+          data[idx + 10] += (errB * 4) / 32;
+        }
+        if (y + 1 < height) {
+          if (x > 1) {
+            data[idx - 8 + width * 4] += (errR * 2) / 32;
+            data[idx - 7 + width * 4] += (errG * 2) / 32;
+            data[idx - 6 + width * 4] += (errB * 2) / 32;
+          }
+          if (x > 0) {
+            data[idx - 4 + width * 4] += (errR * 4) / 32;
+            data[idx - 3 + width * 4] += (errG * 4) / 32;
+            data[idx - 2 + width * 4] += (errB * 4) / 32;
+          }
+          data[idx + width * 4] += (errR * 8) / 32;
+          data[idx + 1 + width * 4] += (errG * 8) / 32;
+          data[idx + 2 + width * 4] += (errB * 8) / 32;
+          if (x + 1 < width) {
+            data[idx + 4 + width * 4] += (errR * 4) / 32;
+            data[idx + 5 + width * 4] += (errG * 4) / 32;
+            data[idx + 6 + width * 4] += (errB * 4) / 32;
+          }
+          if (x + 2 < width) {
+            data[idx + 8 + width * 4] += (errR * 2) / 32;
+            data[idx + 9 + width * 4] += (errG * 2) / 32;
+            data[idx + 10 + width * 4] += (errB * 2) / 32;
+          }
+        }
+      }
+    }
+  } else if (method === "sierra") {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+
+        const r = Math.max(0, Math.min(255, data[idx]));
+        const g = Math.max(0, Math.min(255, data[idx + 1]));
+        const b = Math.max(0, Math.min(255, data[idx + 2]));
+
+        const color = findNearestColor(r, g, b, palette);
+
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+
+        const errR = (r - color.r) * amount;
+        const errG = (g - color.g) * amount;
+        const errB = (b - color.b) * amount;
+
+        // Sierra distributes error to 10 neighbors with weights summing to 32
+        if (x + 1 < width) {
+          data[idx + 4] += (errR * 5) / 32;
+          data[idx + 5] += (errG * 5) / 32;
+          data[idx + 6] += (errB * 5) / 32;
+        }
+        if (x + 2 < width) {
+          data[idx + 8] += (errR * 3) / 32;
+          data[idx + 9] += (errG * 3) / 32;
+          data[idx + 10] += (errB * 3) / 32;
+        }
+        if (y + 1 < height) {
+          if (x > 1) {
+            data[idx - 8 + width * 4] += (errR * 2) / 32;
+            data[idx - 7 + width * 4] += (errG * 2) / 32;
+            data[idx - 6 + width * 4] += (errB * 2) / 32;
+          }
+          if (x > 0) {
+            data[idx - 4 + width * 4] += (errR * 4) / 32;
+            data[idx - 3 + width * 4] += (errG * 4) / 32;
+            data[idx - 2 + width * 4] += (errB * 4) / 32;
+          }
+          data[idx + width * 4] += (errR * 5) / 32;
+          data[idx + 1 + width * 4] += (errG * 5) / 32;
+          data[idx + 2 + width * 4] += (errB * 5) / 32;
+          if (x + 1 < width) {
+            data[idx + 4 + width * 4] += (errR * 4) / 32;
+            data[idx + 5 + width * 4] += (errG * 4) / 32;
+            data[idx + 6 + width * 4] += (errB * 4) / 32;
+          }
+          if (x + 2 < width) {
+            data[idx + 8 + width * 4] += (errR * 2) / 32;
+            data[idx + 9 + width * 4] += (errG * 2) / 32;
+            data[idx + 10 + width * 4] += (errB * 2) / 32;
+          }
+        }
+        if (y + 2 < height) {
+          if (x > 0) {
+            data[idx - 4 + width * 8] += (errR * 2) / 32;
+            data[idx - 3 + width * 8] += (errG * 2) / 32;
+            data[idx - 2 + width * 8] += (errB * 2) / 32;
+          }
+          data[idx + width * 8] += (errR * 3) / 32;
+          data[idx + 1 + width * 8] += (errG * 3) / 32;
+          data[idx + 2 + width * 8] += (errB * 3) / 32;
+          if (x + 1 < width) {
+            data[idx + 4 + width * 8] += (errR * 2) / 32;
+            data[idx + 5 + width * 8] += (errG * 2) / 32;
+            data[idx + 6 + width * 8] += (errB * 2) / 32;
+          }
+        }
+      }
+    }
+  } else if (method === "sierra-lite") {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+
+        const r = Math.max(0, Math.min(255, data[idx]));
+        const g = Math.max(0, Math.min(255, data[idx + 1]));
+        const b = Math.max(0, Math.min(255, data[idx + 2]));
+
+        const color = findNearestColor(r, g, b, palette);
+
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+
+        const errR = (r - color.r) * amount;
+        const errG = (g - color.g) * amount;
+        const errB = (b - color.b) * amount;
+
+        // Sierra Lite distributes error to 4 neighbors with weights summing to 4
+        if (x + 1 < width) {
+          data[idx + 4] += (errR * 2) / 4;
+          data[idx + 5] += (errG * 2) / 4;
+          data[idx + 6] += (errB * 2) / 4;
+        }
+        if (y + 1 < height) {
+          if (x > 0) {
+            data[idx - 4 + width * 4] += (errR * 1) / 4;
+            data[idx - 3 + width * 4] += (errG * 1) / 4;
+            data[idx - 2 + width * 4] += (errB * 1) / 4;
+          }
+          data[idx + width * 4] += (errR * 1) / 4;
+          data[idx + 1 + width * 4] += (errG * 1) / 4;
+          data[idx + 2 + width * 4] += (errB * 1) / 4;
+        }
+      }
+    }
   } else if (method === "ordered") {
     const bayer2 = [
       [0, 2],
@@ -1415,6 +1865,7 @@ async function convertImage() {
     const brightness = parseInt(document.getElementById("brightness").value);
     const contrast = parseInt(document.getElementById("contrast").value);
     const saturation = parseInt(document.getElementById("saturation").value);
+    const hue = parseInt(document.getElementById("hue").value);
     const gamma = parseFloat(document.getElementById("gamma").value);
 
     imageData = applyAdjustments(
@@ -1422,6 +1873,7 @@ async function convertImage() {
       brightness,
       contrast,
       saturation,
+      hue,
       gamma,
     );
 
@@ -1535,7 +1987,7 @@ function updateViewMode() {
     slideContainer.style.alignItems = "flex-start";
 
     setTimeout(() => {
-      updateSlideDivider(50);
+      updateSlideDivider(currentSlidePosition); // Use stored position
     }, 100);
   } else {
     canvasGrid.style.display = "grid";
@@ -1551,8 +2003,10 @@ function updateViewMode() {
 
 // Slide reveal divider handling
 let isDraggingSlider = false;
+let currentSlidePosition = 50; // Store current position
 
 function updateSlideDivider(percentage) {
+  currentSlidePosition = percentage; // Remember the position
   const wrapper = document.getElementById("slideRevealWrapper");
   const divider = document.getElementById("slideDivider");
   const topCanvas = document.getElementById("slideOriginalCanvas");
@@ -1653,6 +2107,18 @@ window.addEventListener("DOMContentLoaded", () => {
   // Clear any persisted file input
   document.getElementById("imageInput").value = "";
 
+  // Reset adjustment controls to default values (prevents browser form persistence)
+  document.getElementById("brightness").value = 0;
+  document.getElementById("brightnessNumber").value = 0;
+  document.getElementById("contrast").value = 0;
+  document.getElementById("contrastNumber").value = 0;
+  document.getElementById("saturation").value = 0;
+  document.getElementById("saturationNumber").value = 0;
+  document.getElementById("hue").value = 0;
+  document.getElementById("hueNumber").value = 0;
+  document.getElementById("gamma").value = 1;
+  document.getElementById("gammaNumber").value = 1;
+
   // Reset window state
   window.sourceImage = null;
 });
@@ -1704,6 +2170,7 @@ const controls = [
   "brightness",
   "contrast",
   "saturation",
+  "hue",
   "gamma",
 ];
 
@@ -1714,6 +2181,7 @@ const continuousControls = [
   "brightness",
   "contrast",
   "saturation",
+  "hue",
   "gamma",
 ];
 
@@ -1940,6 +2408,8 @@ document.getElementById("resetAllBtn").addEventListener("click", () => {
   document.getElementById("contrastNumber").value = 0;
   document.getElementById("saturation").value = 0;
   document.getElementById("saturationNumber").value = 0;
+  document.getElementById("hue").value = 0;
+  document.getElementById("hueNumber").value = 0;
   document.getElementById("gamma").value = 1;
   document.getElementById("gammaNumber").value = 1;
 
@@ -2020,6 +2490,7 @@ function setupSliderNumberSync(sliderId, numberId) {
 setupSliderNumberSync("brightness", "brightnessNumber");
 setupSliderNumberSync("contrast", "contrastNumber");
 setupSliderNumberSync("saturation", "saturationNumber");
+setupSliderNumberSync("hue", "hueNumber");
 setupSliderNumberSync("gamma", "gammaNumber");
 setupSliderNumberSync("colors", "colorsNumber");
 setupSliderNumberSync("ditherAmount", "ditherAmountNumber");
