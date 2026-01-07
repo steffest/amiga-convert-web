@@ -2422,6 +2422,17 @@ document.getElementById("changeImageBtn").addEventListener("click", () => {
   document.getElementById("imageInput").click();
 });
 
+// Helper function to update control group max-height
+function updateControlGroupHeight(element) {
+  const group = element.closest(".control-group");
+  if (group && !group.classList.contains("collapsed")) {
+    const content = group.querySelector(".control-group-content");
+    if (content) {
+      content.style.maxHeight = content.scrollHeight + "px";
+    }
+  }
+}
+
 // Show/hide Bayer size control and dither amount
 document.getElementById("ditherMethod").addEventListener("change", (e) => {
   const method = e.target.value;
@@ -2430,6 +2441,9 @@ document.getElementById("ditherMethod").addEventListener("change", (e) => {
 
   bayerControl.style.display = method === "ordered" ? "block" : "none";
   ditherAmountControl.style.display = method === "none" ? "none" : "block";
+
+  // Update the control group height to accommodate the new visibility
+  updateControlGroupHeight(bayerControl);
 });
 
 // No throttling needed - pending conversion logic handles rapid calls efficiently
