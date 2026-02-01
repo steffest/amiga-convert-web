@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Palette Adjuster</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="main-layout">
+        <div class="controls">
+          <div class="control-group">
+            <h3>Curves</h3>
+            <div class="control-group-content">
+              <div class="curves-inline">
+                <div class="curves-channel-selector">
+                  <button
+                    class="curves-channel-btn rgb active"
+                    data-channel="rgb"
+                  >
+                    RGB
+                  </button>
+                  <button class="curves-channel-btn red" data-channel="red">
+                    R
+                  </button>
+                  <button class="curves-channel-btn green" data-channel="green">
+                    G
+                  </button>
+                  <button class="curves-channel-btn blue" data-channel="blue">
+                    B
+                  </button>
+                </div>
+                <div class="curves-canvas-wrapper">
+                  <canvas
+                    id="curvesCanvas"
+                    class="curves-canvas"
+                    width="256"
+                    height="256"
+                  ></canvas>
+                </div>
+                <button class="curves-reset" id="curvesReset">
+                  Reset Curve
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <h3>Adjustments</h3>
+            <div class="control-group-content">
+              <div class="control-item">
+                <label>Contrast</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="contrast"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                  <input
+                    type="number"
+                    id="contrastNumber"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                </div>
+              </div>
+              <div class="control-item">
+                <label>Hue</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="hue"
+                    min="-180"
+                    max="180"
+                    value="0"
+                    step="1"
+                  />
+                  <input
+                    type="number"
+                    id="hueNumber"
+                    min="-180"
+                    max="180"
+                    value="0"
+                    step="1"
+                  />
+                </div>
+              </div>
+              <div class="control-item">
+                <label>Saturation</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="saturation"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                  <input
+                    type="number"
+                    id="saturationNumber"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                </div>
+              </div>
+              <div class="control-item">
+                <label>Brightness</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="brightness"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                  <input
+                    type="number"
+                    id="brightnessNumber"
+                    min="-100"
+                    max="100"
+                    value="0"
+                    step="1"
+                  />
+                </div>
+              </div>
+              <div class="control-item">
+                <label>Gamma</label>
+                <div class="slider-with-input">
+                  <input
+                    type="range"
+                    id="gamma"
+                    min="0.2"
+                    max="3"
+                    value="1"
+                    step="0.05"
+                  />
+                  <input
+                    type="number"
+                    id="gammaNumber"
+                    min="0.2"
+                    max="3"
+                    value="1"
+                    step="0.05"
+                  />
+                </div>
+              </div>
+              <button class="curves-reset" id="resetAllBtn">
+                Reset All Adjustments
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="canvas-container">
+          <div class="preview-controls">
+            <div class="preview-controls-left">
+              <div>
+                <label for="zoomLevel">Zoom:</label>
+                <select id="zoomLevel">
+                  <option value="fit">Fit</option>
+                  <option value="1">100%</option>
+                  <option value="2">200%</option>
+                  <option value="4">400%</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="preview-controls-right">
+              <button id="chooseImageBtn">Choose Indexed PNG</button>
+              <button
+                id="changeImageBtn"
+                class="secondary-btn"
+                style="display: none"
+              >
+                Change Image
+              </button>
+              <button id="downloadBtn" disabled>Download Adjusted</button>
+            </div>
+          </div>
+
+          <div class="canvas-display" id="canvasDisplay">
+            <input
+              type="file"
+              id="imageInput"
+              accept="image/png"
+              style="display: none"
+            />
+            <div class="drop-message" id="dropMessage">
+              Drop an indexed PNG here or click to choose
+            </div>
+
+            <div
+              class="canvas-grid preview-only"
+              id="canvasGrid"
+              style="display: none"
+            >
+              <div class="canvas-wrapper" id="previewWrapper">
+                <h3>Adjusted Preview</h3>
+                <div class="canvas-scroll">
+                  <canvas id="previewCanvas"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="palette-display" id="paletteDisplay"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="palette-adjuster.js"></script>
+  </body>
+</html>
