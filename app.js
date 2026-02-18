@@ -1,3 +1,51 @@
+// File System Access API helpers
+const supportsFileSystemAccess = 'showOpenFilePicker' in window;
+
+async function openFileWithPicker(inputElement, acceptTypes) {
+  if (supportsFileSystemAccess) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: acceptTypes
+      });
+      return handle.getFile();
+    } catch (e) {
+      if (e.name === 'AbortError') return null; // User cancelled
+      throw e;
+    }
+  }
+  // Fallback: trigger hidden input
+  inputElement.click();
+  return null; // File handled by input's change event
+}
+
+async function saveFileWithPicker(blob, suggestedName) {
+  if (supportsFileSystemAccess) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{
+          description: 'PNG Image',
+          accept: { 'image/png': ['.png'] }
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return; // User cancelled
+      throw e;
+    }
+  }
+  // Fallback: download via link
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = suggestedName;
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 // Curves Editor
 const curvesEditor = {
   canvas: null,
@@ -2419,18 +2467,30 @@ document.getElementById("imageInput").addEventListener("change", (e) => {
 });
 
 // Make drop message clickable
-document.getElementById("dropMessage").addEventListener("click", () => {
-  document.getElementById("imageInput").click();
+document.getElementById("dropMessage").addEventListener("click", async () => {
+  const file = await openFileWithPicker(
+    document.getElementById("imageInput"),
+    [{ description: 'Images', accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'] } }]
+  );
+  if (file) loadImageFile(file);
 });
 
 // Choose Image button (empty state)
-document.getElementById("chooseImageBtn").addEventListener("click", () => {
-  document.getElementById("imageInput").click();
+document.getElementById("chooseImageBtn").addEventListener("click", async () => {
+  const file = await openFileWithPicker(
+    document.getElementById("imageInput"),
+    [{ description: 'Images', accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'] } }]
+  );
+  if (file) loadImageFile(file);
 });
 
 // Change Image button (loaded state)
-document.getElementById("changeImageBtn").addEventListener("click", () => {
-  document.getElementById("imageInput").click();
+document.getElementById("changeImageBtn").addEventListener("click", async () => {
+  const file = await openFileWithPicker(
+    document.getElementById("imageInput"),
+    [{ description: 'Images', accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'] } }]
+  );
+  if (file) loadImageFile(file);
 });
 
 // Helper function to update control group max-height
@@ -2646,7 +2706,7 @@ function createIndexedPNG(width, height, indexedData, palette) {
 }
 
 // Download button
-document.getElementById("downloadBtn").addEventListener("click", () => {
+document.getElementById("downloadBtn").addEventListener("click", async () => {
   // Always export as indexed PNG
   // Use whichever preview canvas is currently visible/active
   const previewCanvas = document.getElementById("previewCanvas");
@@ -2660,6 +2720,8 @@ document.getElementById("downloadBtn").addEventListener("click", () => {
   } else {
     canvas = previewCanvas;
   }
+
+  const baseName = window.sourceFilename || "amiga-converted";
 
   if (currentPalette.length > 0) {
     // Create indexed PNG with exact palette
@@ -2699,21 +2761,13 @@ document.getElementById("downloadBtn").addEventListener("click", () => {
     );
 
     const blob = new Blob([pngData], { type: "image/png" });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    const baseName = window.sourceFilename || "amiga-converted";
-    link.download = `${baseName}.png`;
-    link.href = url;
-    link.click();
-    URL.revokeObjectURL(url);
+    await saveFileWithPicker(blob, `${baseName}.png`);
   } else {
     // Fallback to RGB PNG if no palette available
-    const link = document.createElement("a");
-    const baseName = window.sourceFilename || "amiga-converted";
-    link.download = `${baseName}.png`;
-    link.href = canvas.toDataURL();
-    link.click();
+    const dataUrl = canvas.toDataURL();
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    await saveFileWithPicker(blob, `${baseName}.png`);
   }
 });
 
@@ -3187,8 +3241,12 @@ document.getElementById("clearLocksBtn").addEventListener("click", () => {
 });
 
 // Load palette from PNG
-document.getElementById("loadPaletteBtn").addEventListener("click", () => {
-  document.getElementById("paletteInput").click();
+document.getElementById("loadPaletteBtn").addEventListener("click", async () => {
+  const file = await openFileWithPicker(
+    document.getElementById("paletteInput"),
+    [{ description: 'PNG Images', accept: { 'image/png': ['.png'] } }]
+  );
+  if (file) loadPaletteFromPNG(file);
 });
 
 document.getElementById("paletteInput").addEventListener("change", (e) => {

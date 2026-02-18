@@ -1,5 +1,53 @@
 // Palette Adjuster - applies color adjustments to indexed PNG palettes
 
+// File System Access API helpers
+const supportsFileSystemAccess = 'showOpenFilePicker' in window;
+
+async function openFileWithPicker(inputElement, acceptTypes) {
+  if (supportsFileSystemAccess) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: acceptTypes
+      });
+      return handle.getFile();
+    } catch (e) {
+      if (e.name === 'AbortError') return null; // User cancelled
+      throw e;
+    }
+  }
+  // Fallback: trigger hidden input
+  inputElement.click();
+  return null; // File handled by input's change event
+}
+
+async function saveFileWithPicker(blob, suggestedName) {
+  if (supportsFileSystemAccess) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{
+          description: 'PNG Image',
+          accept: { 'image/png': ['.png'] }
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return; // User cancelled
+      throw e;
+    }
+  }
+  // Fallback: download via link
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = suggestedName;
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 // State
 let originalPalette = []; // Original palette from loaded PNG
 let adjustedPalette = []; // Palette after adjustments
@@ -950,7 +998,7 @@ function createIndexedPNG(width, height, indexedData, palette) {
 }
 
 // Export adjusted PNG
-function exportAdjustedPNG() {
+async function exportAdjustedPNG() {
   if (indexedPixels.length === 0 || adjustedPalette.length === 0) {
     alert("No image loaded");
     return;
@@ -964,14 +1012,8 @@ function exportAdjustedPNG() {
   );
 
   const blob = new Blob([pngData], { type: "image/png" });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
   const baseName = sourceFilename || "palette-adjusted";
-  link.download = `${baseName}.png`;
-  link.href = url;
-  link.click();
-  URL.revokeObjectURL(url);
+  await saveFileWithPicker(blob, `${baseName}.png`);
 }
 
 // Slider sync function
@@ -1116,32 +1158,40 @@ document.addEventListener("DOMContentLoaded", () => {
   const canvasGrid = document.getElementById("canvasGrid");
   const dropMessage = document.getElementById("dropMessage");
 
-  chooseImageBtn.addEventListener("click", () => {
-    imageInput.click();
-  });
+  // Helper to handle successful image load
+  function onImageLoaded() {
+    canvasDisplay.classList.add("has-image");
+    canvasGrid.style.display = "grid";
+    dropMessage.style.display = "none";
+    chooseImageBtn.style.display = "none";
+    changeImageBtn.style.display = "block";
+    downloadBtn.disabled = false;
+    curvesEditor.calculateHistogram(originalPalette);
+    updatePreview();
+  }
 
-  changeImageBtn.addEventListener("click", () => {
-    imageInput.click();
-  });
+  // Helper to open image file with native picker or fallback
+  async function openImageFile() {
+    const file = await openFileWithPicker(
+      imageInput,
+      [{ description: 'PNG Images', accept: { 'image/png': ['.png'] } }]
+    );
+    if (file) {
+      const success = await loadIndexedPNG(file);
+      if (success) onImageLoaded();
+    }
+  }
+
+  chooseImageBtn.addEventListener("click", openImageFile);
+
+  changeImageBtn.addEventListener("click", openImageFile);
 
   imageInput.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const success = await loadIndexedPNG(file);
-    if (success) {
-      canvasDisplay.classList.add("has-image");
-      canvasGrid.style.display = "grid";
-      dropMessage.style.display = "none";
-      chooseImageBtn.style.display = "none";
-      changeImageBtn.style.display = "block";
-      downloadBtn.disabled = false;
-
-      // Update histogram
-      curvesEditor.calculateHistogram(originalPalette);
-
-      updatePreview();
-    }
+    if (success) onImageLoaded();
 
     e.target.value = "";
   });
@@ -1163,24 +1213,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const file = e.dataTransfer.files[0];
     if (file && file.type === "image/png") {
       const success = await loadIndexedPNG(file);
-      if (success) {
-        canvasDisplay.classList.add("has-image");
-        canvasGrid.style.display = "grid";
-        dropMessage.style.display = "none";
-        chooseImageBtn.style.display = "none";
-        changeImageBtn.style.display = "block";
-        downloadBtn.disabled = false;
-
-        curvesEditor.calculateHistogram(originalPalette);
-        updatePreview();
-      }
+      if (success) onImageLoaded();
     }
   });
 
   // Click on drop zone to choose image
-  dropMessage.addEventListener("click", () => {
-    imageInput.click();
-  });
+  dropMessage.addEventListener("click", openImageFile);
 
   // Download button
   downloadBtn.addEventListener("click", () => {

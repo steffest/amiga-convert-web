@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Amiga 12-bit Color Preview</title>
+    <meta name="theme-color" content="#1a1a2e" />
+    <meta
+      name="description"
+      content="Convert images to Amiga 12-bit color palette with dithering"
+    />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <title>Amiga Image Converter</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -351,7 +359,7 @@
               >
                 Change Image
               </button>
-              <button id="downloadBtn" disabled>Download Result</button>
+              <button id="downloadBtn" disabled>Save Result</button>
             </div>
           </div>
 
@@ -449,5 +457,10 @@
     </div>
 
     <script src="app.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js");
+      }
+    </script>
   </body>
 </html>
