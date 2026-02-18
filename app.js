@@ -2165,6 +2165,9 @@ async function convertImage() {
       ditherMethod: document.getElementById("ditherMethod").value,
       ditherAmount: parseFloat(document.getElementById("ditherAmount").value),
       bayerSize: parseInt(document.getElementById("bayerSize").value),
+      errorDampening: document.getElementById("errorDampeningEnabled").checked
+        ? parseFloat(document.getElementById("errorDampeningThreshold").value)
+        : null,
       matteColor: { r: matteR, g: matteG, b: matteB },
     };
 
@@ -2395,10 +2398,14 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("quantMethod").value = "rgbquant";
   document.getElementById("colorDistance").value = "rgb-euclidean";
   document.getElementById("matteColorInput").value = "#fff";
+  document.getElementById("errorDampeningEnabled").checked = false;
+  document.getElementById("errorDampeningThreshold").value = 48;
+  document.getElementById("errorDampeningThresholdNumber").value = 48;
 
   // Set initial visibility for conditional controls
   document.getElementById("bayerSizeControl").style.display = "none";
   document.getElementById("ditherAmountControl").style.display = "block";
+  document.getElementById("errorDampeningControl").style.display = "block";
 
   // Reset window state
   window.sourceImage = null;
@@ -2437,14 +2444,18 @@ function updateControlGroupHeight(element) {
   }
 }
 
-// Show/hide Bayer size control and dither amount
+// Show/hide Bayer size control, dither amount, and error dampening
 document.getElementById("ditherMethod").addEventListener("change", (e) => {
   const method = e.target.value;
   const bayerControl = document.getElementById("bayerSizeControl");
   const ditherAmountControl = document.getElementById("ditherAmountControl");
+  const errorDampeningControl = document.getElementById("errorDampeningControl");
+
+  const isErrorDiffusion = method !== "ordered" && method !== "none";
 
   bayerControl.style.display = method === "ordered" ? "block" : "none";
   ditherAmountControl.style.display = method === "none" ? "none" : "block";
+  errorDampeningControl.style.display = isErrorDiffusion ? "block" : "none";
 
   // Update the control group height to accommodate the new visibility
   updateControlGroupHeight(bayerControl);
@@ -2464,6 +2475,7 @@ const controls = [
   "saturation",
   "hue",
   "gamma",
+  "errorDampeningThreshold",
 ];
 
 // Continuous controls (sliders) use debouncing for smooth interaction
@@ -2475,14 +2487,16 @@ const continuousControls = [
   "saturation",
   "hue",
   "gamma",
+  "errorDampeningThreshold",
 ];
 
-// Discrete controls (dropdowns) convert immediately
+// Discrete controls (dropdowns, checkboxes) convert immediately
 const discreteControls = [
   "quantMethod",
   "ditherMethod",
   "bayerSize",
   "colorDistance",
+  "errorDampeningEnabled",
 ];
 
 continuousControls.forEach((id) => {
@@ -2798,6 +2812,7 @@ setupSliderNumberSync("hue", "hueNumber");
 setupSliderNumberSync("gamma", "gammaNumber");
 setupSliderNumberSync("colors", "colorsNumber");
 setupSliderNumberSync("ditherAmount", "ditherAmountNumber");
+setupSliderNumberSync("errorDampeningThreshold", "errorDampeningThresholdNumber");
 
 // Double-click to reset sliders to default values
 const sliderDefaults = {
@@ -2808,6 +2823,7 @@ const sliderDefaults = {
   gamma: 1,
   colors: 32,
   ditherAmount: 0.5,
+  errorDampeningThreshold: 48,
 };
 
 Object.entries(sliderDefaults).forEach(([sliderId, defaultValue]) => {

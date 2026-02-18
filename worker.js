@@ -791,7 +791,7 @@ function generateBayerMatrix(size) {
 }
 
 // Apply dithering
-function applyDithering(imageData, palette, method, amount, bayerSize, metric) {
+function applyDithering(imageData, palette, method, amount, bayerSize, metric, errorDampening) {
   const width = imageData.width;
   const height = imageData.height;
   const data = new Int16Array(imageData.data);
@@ -914,9 +914,21 @@ function applyDithering(imageData, palette, method, amount, bayerSize, metric) {
         data[idx + 1] = color.g;
         data[idx + 2] = color.b;
 
-        const errR = (r - color.r) * amount;
-        const errG = (g - color.g) * amount;
-        const errB = (b - color.b) * amount;
+        let errR = (r - color.r) * amount;
+        let errG = (g - color.g) * amount;
+        let errB = (b - color.b) * amount;
+
+        // Error dampening: if error magnitude exceeds threshold, dampen by 0.8
+        // This suppresses bright, sparse pixels (technique from libimagequant)
+        if (errorDampening !== null) {
+          const errMagnitude = Math.sqrt(errR * errR + errG * errG + errB * errB);
+          if (errMagnitude > errorDampening) {
+            const dampenFactor = 0.8;
+            errR *= dampenFactor;
+            errG *= dampenFactor;
+            errB *= dampenFactor;
+          }
+        }
 
         for (const [dx, dy, weight] of matrix) {
           const nx = x + dx;
@@ -980,7 +992,8 @@ self.addEventListener('message', function(e) {
       params.ditherMethod,
       params.ditherAmount,
       params.bayerSize,
-      params.colorDistance
+      params.colorDistance,
+      params.errorDampening
     );
 
     // Send result back
