@@ -753,7 +753,13 @@ function extractIHDR(bytes) {
   return null;
 }
 
+let sourceFilename = null;
+
 async function loadIndexedPNG(file) {
+  // Store original filename (without extension) for download
+  const lastDot = file.name.lastIndexOf(".");
+  sourceFilename = lastDot > 0 ? file.name.substring(0, lastDot) : file.name;
+
   const arrayBuffer = await file.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
 
@@ -961,7 +967,8 @@ function exportAdjustedPNG() {
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement("a");
-  link.download = "palette-adjusted.png";
+  const baseName = sourceFilename || "palette-adjusted";
+  link.download = `${baseName}.png`;
   link.href = url;
   link.click();
   URL.revokeObjectURL(url);

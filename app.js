@@ -2331,6 +2331,10 @@ canvasDisplay.addEventListener("drop", (e) => {
 });
 
 function loadImageFile(file) {
+  // Store original filename (without extension) for download
+  const lastDot = file.name.lastIndexOf(".");
+  window.sourceFilename = lastDot > 0 ? file.name.substring(0, lastDot) : file.name;
+
   const reader = new FileReader();
   reader.onload = (event) => {
     const img = new Image();
@@ -2684,14 +2688,16 @@ document.getElementById("downloadBtn").addEventListener("click", () => {
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
-    link.download = "amiga-converted-indexed.png";
+    const baseName = window.sourceFilename || "amiga-converted";
+    link.download = `${baseName}.png`;
     link.href = url;
     link.click();
     URL.revokeObjectURL(url);
   } else {
     // Fallback to RGB PNG if no palette available
     const link = document.createElement("a");
-    link.download = "amiga-converted.png";
+    const baseName = window.sourceFilename || "amiga-converted";
+    link.download = `${baseName}.png`;
     link.href = canvas.toDataURL();
     link.click();
   }
