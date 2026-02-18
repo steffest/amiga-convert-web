@@ -2274,6 +2274,10 @@ async function convertImage() {
       matteB = parseInt(matteHex.slice(5, 7), 16);
     }
 
+    // Alpha handling mode
+    const alphaMode = document.getElementById("alphaMode").value;
+    const alphaThreshold = parseInt(document.getElementById("alphaThreshold").value);
+
     // Gather all parameters
     const params = {
       brightness: parseInt(document.getElementById("brightness").value),
@@ -2292,6 +2296,8 @@ async function convertImage() {
       errorDampening: document.getElementById("errorDampeningEnabled").checked
         ? parseFloat(document.getElementById("errorDampeningThreshold").value)
         : null,
+      alphaMode: alphaMode,
+      alphaThreshold: alphaThreshold,
       matteColor: { r: matteR, g: matteG, b: matteB },
     };
 
@@ -2651,6 +2657,41 @@ document
   .getElementById("matteColorInput")
   .addEventListener("change", convertImage);
 
+// Update transparency grid on preview canvases based on alpha mode
+function updatePreviewTransparencyGrid() {
+  const mode = document.getElementById("alphaMode").value;
+  const showGrid = mode === "threshold";
+  document.getElementById("previewCanvas").classList.toggle("transparency-grid", showGrid);
+  document.getElementById("slidePreviewCanvas").classList.toggle("transparency-grid", showGrid);
+}
+
+// Alpha mode toggle
+document.getElementById("alphaMode").addEventListener("change", (e) => {
+  const mode = e.target.value;
+  document.getElementById("alphaModeMatteOptions").style.display = mode === "matte" ? "flex" : "none";
+  document.getElementById("alphaModeThresholdOptions").style.display = mode === "threshold" ? "flex" : "none";
+  updatePreviewTransparencyGrid();
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
+
+// Alpha threshold slider sync
+document.getElementById("alphaThreshold").addEventListener("input", (e) => {
+  document.getElementById("alphaThresholdNumber").value = e.target.value;
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
+
+document.getElementById("alphaThresholdNumber").addEventListener("input", (e) => {
+  const value = Math.max(1, Math.min(255, parseInt(e.target.value) || 128));
+  document.getElementById("alphaThreshold").value = value;
+  if (window.sourceImage) {
+    convertImage();
+  }
+});
+
 // View mode and zoom changes
 document.getElementById("viewMode").addEventListener("change", () => {
   if (window.sourceImage) {
@@ -2894,7 +2935,11 @@ function gatherSettings() {
       brightness: parseInt(document.getElementById("brightness").value),
       gamma: parseFloat(document.getElementById("gamma").value),
     },
-    matteColor: document.getElementById("matteColorInput").value,
+    alpha: {
+      mode: document.getElementById("alphaMode").value,
+      threshold: parseInt(document.getElementById("alphaThreshold").value),
+      matteColor: document.getElementById("matteColorInput").value,
+    },
   };
 }
 
@@ -2977,8 +3022,24 @@ function applySettings(settings) {
     }
   }
 
-  // Matte color
-  if (settings.matteColor !== undefined) {
+  // Alpha settings (new format)
+  if (settings.alpha) {
+    const a = settings.alpha;
+    if (a.mode !== undefined) {
+      document.getElementById("alphaMode").value = a.mode;
+      document.getElementById("alphaModeMatteOptions").style.display = a.mode === "matte" ? "flex" : "none";
+      document.getElementById("alphaModeThresholdOptions").style.display = a.mode === "threshold" ? "flex" : "none";
+      updatePreviewTransparencyGrid();
+    }
+    if (a.threshold !== undefined) {
+      document.getElementById("alphaThreshold").value = a.threshold;
+      document.getElementById("alphaThresholdNumber").value = a.threshold;
+    }
+    if (a.matteColor !== undefined) {
+      document.getElementById("matteColorInput").value = a.matteColor;
+    }
+  } else if (settings.matteColor !== undefined) {
+    // Backwards compatibility with old format
     document.getElementById("matteColorInput").value = settings.matteColor;
   }
 

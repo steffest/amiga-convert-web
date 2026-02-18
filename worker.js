@@ -181,7 +181,7 @@ function applyCurves(imageData, curvesLUTs) {
 }
 
 // Apply adjustments (brightness, contrast, saturation, hue, gamma)
-function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamma, curvesLUTs, matteColor) {
+function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamma, curvesLUTs, alphaMode, alphaThreshold, matteColor) {
   const data = imageData.data;
 
   // Apply curves first
@@ -240,9 +240,21 @@ function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamm
     data[i + 2] = Math.max(0, Math.min(255, b));
   }
 
-  // Finally, composite alpha onto matte color AFTER all adjustments
-  // This ensures the matte color stays exact and only source pixels are adjusted
-  if (matteColor) {
+  // Handle alpha based on mode
+  if (alphaMode === 'threshold') {
+    // Threshold mode: pixels below threshold become fully transparent, above become fully opaque
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3];
+      if (alpha < alphaThreshold) {
+        // Below threshold: fully transparent
+        data[i + 3] = 0;
+      } else {
+        // At or above threshold: fully opaque
+        data[i + 3] = 255;
+      }
+    }
+  } else if (matteColor) {
+    // Matte mode: composite semi-transparent pixels onto matte color
     const mr = matteColor.r;
     const mg = matteColor.g;
     const mb = matteColor.b;
@@ -973,6 +985,8 @@ self.addEventListener('message', function(e) {
       params.hue,
       params.gamma,
       params.curvesLUTs,
+      params.alphaMode,
+      params.alphaThreshold,
       params.matteColor
     );
 

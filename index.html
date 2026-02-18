@@ -441,18 +441,44 @@
               <button id="loadPaletteBtn">Load Palette</button>
               <button id="lockAllBtn">Lock All</button>
               <button id="clearLocksBtn">Clear Locks</button>
-              <div class="matte-color-control">
-                <label for="matteColorInput" style="margin: 0"
-                  >Alpha Matte:</label
+              <div class="alpha-controls">
+                <label for="alphaMode" style="margin: 0">Alpha:</label>
+                <select id="alphaMode" style="width: auto">
+                  <option value="matte">Matte</option>
+                  <option value="threshold">Threshold</option>
+                </select>
+                <div class="alpha-matte-options" id="alphaModeMatteOptions">
+                  <input
+                    type="text"
+                    id="matteColorInput"
+                    value="#FFF"
+                    placeholder="#FFF"
+                    style="width: 70px"
+                    title="Background color for semi-transparent pixels"
+                  />
+                </div>
+                <div
+                  class="alpha-threshold-options"
+                  id="alphaModeThresholdOptions"
+                  style="display: none"
                 >
-                <input
-                  type="text"
-                  id="matteColorInput"
-                  value="#FFF"
-                  placeholder="#FFF"
-                  style="width: 80px"
-                  title="Background color for transparent pixels (e.g., #FFF or #FFFFFF)"
-                />
+                  <input
+                    type="range"
+                    id="alphaThreshold"
+                    min="1"
+                    max="255"
+                    value="128"
+                    title="Pixels below this alpha value become transparent"
+                  />
+                  <input
+                    type="number"
+                    id="alphaThresholdNumber"
+                    min="1"
+                    max="255"
+                    value="128"
+                    style="width: 70px"
+                  />
+                </div>
               </div>
             </div>
             <input
