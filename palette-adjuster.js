@@ -20,15 +20,18 @@ async function openFileWithPicker(inputElement, acceptTypes) {
   return null; // File handled by input's change event
 }
 
-async function saveFileWithPicker(blob, suggestedName) {
+async function saveFileWithPicker(blob, suggestedName, fileTypes) {
+  // Default to PNG if no file types specified
+  const types = fileTypes || [{
+    description: 'PNG Image',
+    accept: { 'image/png': ['.png'] }
+  }];
+
   if (supportsFileSystemAccess) {
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName,
-        types: [{
-          description: 'PNG Image',
-          accept: { 'image/png': ['.png'] }
-        }]
+        types
       });
       const writable = await handle.createWritable();
       await writable.write(blob);

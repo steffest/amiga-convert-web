@@ -22,154 +22,123 @@
           <div class="control-group">
             <h3>Conversion</h3>
             <div class="control-group-content">
-              <div class="control-item">
-                <label>Colors</label>
-                <div class="slider-with-input">
-                  <input
-                    type="range"
-                    id="colors"
-                    min="2"
-                    max="256"
-                    value="32"
-                    step="1"
-                  />
-                  <input
-                    type="number"
-                    id="colorsNumber"
-                    min="2"
-                    max="256"
-                    value="32"
-                    step="1"
-                  />
+              <div class="control-group-content-inner">
+                <div class="control-item">
+                  <label>Colors</label>
+                  <div class="slider-with-input">
+                    <input
+                      type="range"
+                      id="colors"
+                      min="2"
+                      max="256"
+                      value="32"
+                      step="1"
+                    />
+                    <input
+                      type="number"
+                      id="colorsNumber"
+                      min="2"
+                      max="256"
+                      value="32"
+                      step="1"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div class="control-item">
-                <label for="quantMethod">Quantization</label>
-                <select id="quantMethod">
-                  <option value="rgbquant" selected>RGB Quant (best)</option>
-                  <option value="wuquant">Wu Quant (fast)</option>
-                  <option value="neuquant">Neu Quant (slow)</option>
-                  <option value="median-cut">Median Cut</option>
-                </select>
-              </div>
-              <div class="control-item">
-                <label for="colorDistance">Color Distance</label>
-                <select id="colorDistance">
-                  <option value="rgb-euclidean" selected>
-                    RGB Euclidean (fast)
-                  </option>
-                  <option value="weighted-rgb">Weighted RGB (fast)</option>
-                  <option value="redmean">Redmean (perceptual)</option>
-                  <option value="cie76-lab">CIE76 LAB (accurate)</option>
-                </select>
-              </div>
-              <div class="control-item">
-                <label for="ditherMethod">Dithering</label>
-                <select id="ditherMethod">
-                  <option value="floyd-steinberg" selected>
-                    Floyd-Steinberg
-                  </option>
-                  <option value="jarvis-judice-ninke">
-                    Jarvis-Judice-Ninke
-                  </option>
-                  <option value="stucki">Stucki</option>
-                  <option value="burkes">Burkes</option>
-                  <option value="sierra">Sierra</option>
-                  <option value="sierra-lite">Sierra Lite</option>
-                  <option value="atkinson">Atkinson</option>
-                  <option value="ordered">Ordered (Bayer)</option>
-                  <option value="none">None</option>
-                </select>
-              </div>
-              <div
-                class="control-item"
-                id="bayerSizeControl"
-                style="display: none"
-              >
-                <label for="bayerSize">Bayer Matrix Size</label>
-                <select id="bayerSize">
-                  <option value="2">2x2</option>
-                  <option value="4">4x4</option>
-                  <option value="8" selected>8x8</option>
-                </select>
-              </div>
-              <div class="control-item" id="ditherAmountControl">
-                <label>Dither Amount</label>
-                <div class="slider-with-input">
-                  <input
-                    type="range"
-                    id="ditherAmount"
-                    min="0"
-                    max="1"
-                    value="0.5"
-                    step="0.01"
-                  />
-                  <input
-                    type="number"
-                    id="ditherAmountNumber"
-                    min="0"
-                    max="1"
-                    value="0.5"
-                    step="0.05"
-                  />
+                <div class="control-item">
+                  <label for="quantMethod">Quantization</label>
+                  <select id="quantMethod">
+                    <option value="rgbquant" selected>RGB Quant</option>
+                    <option value="wuquant">Wu Quant</option>
+                    <option value="neuquant">Neu Quant</option>
+                    <option value="median-cut">Median Cut</option>
+                  </select>
                 </div>
-              </div>
-              <div class="control-item" id="errorDampeningControl">
-                <label>
-                  <input type="checkbox" id="errorDampeningEnabled" />
-                  Error Dampening
-                </label>
-                <div class="slider-with-input">
-                  <input
-                    type="range"
-                    id="errorDampeningThreshold"
-                    min="1"
-                    max="400"
-                    value="48"
-                    step="1"
-                  />
-                  <input
-                    type="number"
-                    id="errorDampeningThresholdNumber"
-                    min="1"
-                    max="400"
-                    value="48"
-                    step="1"
-                  />
+                <div class="control-item">
+                  <label for="colorDistance">Color Distance</label>
+                  <select id="colorDistance">
+                    <option value="rgb-euclidean" selected>
+                      RGB Euclidean
+                    </option>
+                    <option value="weighted-rgb">Weighted RGB</option>
+                    <option value="redmean">Redmean</option>
+                    <option value="cie76-lab">CIE76 LAB</option>
+                  </select>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="control-group">
-            <h3>Resize</h3>
-            <div class="control-group-content">
-              <div class="control-item">
-                <div class="resize-inputs">
-                  <input
-                    type="number"
-                    id="resizeWidth"
-                    min="1"
-                    max="4096"
-                    value="320"
-                    placeholder="Width"
-                  />
-                  <span class="resize-separator">×</span>
-                  <input
-                    type="number"
-                    id="resizeHeight"
-                    min="1"
-                    max="4096"
-                    value="256"
-                    placeholder="Height"
-                  />
+                <div class="control-item">
+                  <label for="ditherMethod">Dithering</label>
+                  <select id="ditherMethod">
+                    <option value="floyd-steinberg" selected>
+                      Floyd-Steinberg
+                    </option>
+                    <option value="jarvis-judice-ninke">
+                      Jarvis-Judice-Ninke
+                    </option>
+                    <option value="stucki">Stucki</option>
+                    <option value="burkes">Burkes</option>
+                    <option value="sierra">Sierra</option>
+                    <option value="sierra-lite">Sierra Lite</option>
+                    <option value="atkinson">Atkinson</option>
+                    <option value="ordered">Ordered (Bayer)</option>
+                    <option value="none">None</option>
+                  </select>
                 </div>
-              </div>
-              <div class="control-item">
-                <label>
-                  <input type="checkbox" id="aspectRatioLock" checked />
-                  Lock Aspect Ratio
-                </label>
+                <div
+                  class="control-item"
+                  id="bayerSizeControl"
+                  style="display: none"
+                >
+                  <label for="bayerSize">Bayer Matrix Size</label>
+                  <select id="bayerSize">
+                    <option value="2">2x2</option>
+                    <option value="4">4x4</option>
+                    <option value="8" selected>8x8</option>
+                  </select>
+                </div>
+                <div class="control-item" id="ditherAmountControl">
+                  <label>Dither Amount</label>
+                  <div class="slider-with-input">
+                    <input
+                      type="range"
+                      id="ditherAmount"
+                      min="0"
+                      max="1"
+                      value="0.5"
+                      step="0.01"
+                    />
+                    <input
+                      type="number"
+                      id="ditherAmountNumber"
+                      min="0"
+                      max="1"
+                      value="0.5"
+                      step="0.05"
+                    />
+                  </div>
+                </div>
+                <div class="control-item" id="errorDampeningControl">
+                  <label>
+                    <input type="checkbox" id="errorDampeningEnabled" />
+                    Error Dampening
+                  </label>
+                  <div class="slider-with-input">
+                    <input
+                      type="range"
+                      id="errorDampeningThreshold"
+                      min="1"
+                      max="400"
+                      value="48"
+                      step="1"
+                    />
+                    <input
+                      type="number"
+                      id="errorDampeningThresholdNumber"
+                      min="1"
+                      max="400"
+                      value="48"
+                      step="1"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -177,35 +146,40 @@
           <div class="control-group">
             <h3>Curves</h3>
             <div class="control-group-content">
-              <div class="curves-inline">
-                <div class="curves-channel-selector">
-                  <button
-                    class="curves-channel-btn rgb active"
-                    data-channel="rgb"
-                  >
-                    RGB
-                  </button>
-                  <button class="curves-channel-btn red" data-channel="red">
-                    R
-                  </button>
-                  <button class="curves-channel-btn green" data-channel="green">
-                    G
-                  </button>
-                  <button class="curves-channel-btn blue" data-channel="blue">
-                    B
+              <div class="control-group-content-inner">
+                <div class="curves-inline">
+                  <div class="curves-channel-selector">
+                    <button
+                      class="curves-channel-btn rgb active"
+                      data-channel="rgb"
+                    >
+                      RGB
+                    </button>
+                    <button class="curves-channel-btn red" data-channel="red">
+                      R
+                    </button>
+                    <button
+                      class="curves-channel-btn green"
+                      data-channel="green"
+                    >
+                      G
+                    </button>
+                    <button class="curves-channel-btn blue" data-channel="blue">
+                      B
+                    </button>
+                  </div>
+                  <div class="curves-canvas-wrapper">
+                    <canvas
+                      id="curvesCanvas"
+                      class="curves-canvas"
+                      width="256"
+                      height="256"
+                    ></canvas>
+                  </div>
+                  <button class="curves-reset" id="curvesReset">
+                    Reset Curve
                   </button>
                 </div>
-                <div class="curves-canvas-wrapper">
-                  <canvas
-                    id="curvesCanvas"
-                    class="curves-canvas"
-                    width="256"
-                    height="256"
-                  ></canvas>
-                </div>
-                <button class="curves-reset" id="curvesReset">
-                  Reset Curve
-                </button>
               </div>
             </div>
           </div>
@@ -213,116 +187,164 @@
           <div class="control-group">
             <h3>Adjustments</h3>
             <div class="control-group-content">
-              <div class="control-item">
-                <label>Contrast</label>
-                <div class="slider-with-input">
-                  <input
-                    type="range"
-                    id="contrast"
-                    min="-100"
-                    max="100"
-                    value="0"
-                    step="1"
-                  />
-                  <input
-                    type="number"
-                    id="contrastNumber"
-                    min="-100"
-                    max="100"
-                    value="0"
-                    step="1"
-                  />
+              <div class="control-group-content-inner">
+                <div class="control-item">
+                  <label>Contrast</label>
+                  <div class="slider-with-input">
+                    <input
+                      type="range"
+                      id="contrast"
+                      min="-100"
+                      max="100"
+                      value="0"
+                      step="1"
+                    />
+                    <input
+                      type="number"
+                      id="contrastNumber"
+                      min="-100"
+                      max="100"
+                      value="0"
+                      step="1"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div class="control-item">
-                <label>Hue</label>
-                <div class="slider-with-input">
-                  <input
-                    type="range"
-                    id="hue"
-                    min="-180"
-                    max="180"
-                    value="0"
-                    step="1"
-                  />
-                  <input
-                    type="number"
-                    id="hueNumber"
-                    min="-180"
-                    max="180"
-                    value="0"
-                    step="1"
-                  />
+                <div class="control-item">
+                  <label>Hue</label>
+                  <div class="slider-with-input">
+                    <input
+                      type="range"
+                      id="hue"
+                      min="-180"
+                      max="180"
+                      value="0"
+                      step="1"
+                    />
+                    <input
+                      type="number"
+                      id="hueNumber"
+                      min="-180"
+                      max="180"
+                      value="0"
+                      step="1"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div class="control-item">
-                <label>Saturation</label>
-                <div class="slider-with-input">
-                  <input
-                    type="range"
-                    id="saturation"
-                    min="-100"
-                    max="100"
-                    value="0"
-                    step="1"
-                  />
-                  <input
-                    type="number"
-                    id="saturationNumber"
-                    min="-100"
-                    max="100"
-                    value="0"
-                    step="1"
-                  />
+                <div class="control-item">
+                  <label>Saturation</label>
+                  <div class="slider-with-input">
+                    <input
+                      type="range"
+                      id="saturation"
+                      min="-100"
+                      max="100"
+                      value="0"
+                      step="1"
+                    />
+                    <input
+                      type="number"
+                      id="saturationNumber"
+                      min="-100"
+                      max="100"
+                      value="0"
+                      step="1"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div class="control-item">
-                <label>Brightness</label>
-                <div class="slider-with-input">
-                  <input
-                    type="range"
-                    id="brightness"
-                    min="-100"
-                    max="100"
-                    value="0"
-                    step="1"
-                  />
-                  <input
-                    type="number"
-                    id="brightnessNumber"
-                    min="-100"
-                    max="100"
-                    value="0"
-                    step="1"
-                  />
+                <div class="control-item">
+                  <label>Brightness</label>
+                  <div class="slider-with-input">
+                    <input
+                      type="range"
+                      id="brightness"
+                      min="-100"
+                      max="100"
+                      value="0"
+                      step="1"
+                    />
+                    <input
+                      type="number"
+                      id="brightnessNumber"
+                      min="-100"
+                      max="100"
+                      value="0"
+                      step="1"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div class="control-item">
-                <label>Gamma</label>
-                <div class="slider-with-input">
-                  <input
-                    type="range"
-                    id="gamma"
-                    min="0.2"
-                    max="3"
-                    value="1"
-                    step="0.05"
-                  />
-                  <input
-                    type="number"
-                    id="gammaNumber"
-                    min="0.2"
-                    max="3"
-                    value="1"
-                    step="0.05"
-                  />
+                <div class="control-item">
+                  <label>Gamma</label>
+                  <div class="slider-with-input">
+                    <input
+                      type="range"
+                      id="gamma"
+                      min="0.2"
+                      max="3"
+                      value="1"
+                      step="0.05"
+                    />
+                    <input
+                      type="number"
+                      id="gammaNumber"
+                      min="0.2"
+                      max="3"
+                      value="1"
+                      step="0.05"
+                    />
+                  </div>
                 </div>
+                <button class="curves-reset" id="resetAllBtn">
+                  Reset All Adjustments
+                </button>
               </div>
-              <button class="curves-reset" id="resetAllBtn">
-                Reset All Adjustments
-              </button>
             </div>
           </div>
+
+          <div class="control-group">
+            <h3>Resize</h3>
+            <div class="control-group-content">
+              <div class="control-group-content-inner">
+                <div class="control-item">
+                  <div class="resize-inputs">
+                    <input
+                      type="number"
+                      id="resizeWidth"
+                      min="1"
+                      max="4096"
+                      value="320"
+                      placeholder="Width"
+                    />
+                    <span class="resize-separator">×</span>
+                    <input
+                      type="number"
+                      id="resizeHeight"
+                      min="1"
+                      max="4096"
+                      value="256"
+                      placeholder="Height"
+                    />
+                  </div>
+                </div>
+                <div class="control-item">
+                  <label>
+                    <input type="checkbox" id="aspectRatioLock" checked />
+                    Lock Aspect Ratio
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="preset-buttons">
+            <button id="loadSettingsBtn">Load Settings</button>
+            <button id="saveSettingsBtn">Save Settings</button>
+          </div>
+          <input
+            type="file"
+            id="settingsInput"
+            accept="application/json,.json"
+            style="display: none"
+          />
         </div>
 
         <div class="canvas-container">
@@ -412,32 +434,34 @@
             </div>
           </div>
 
-          <div class="palette-display" id="paletteDisplay"></div>
-          <div class="palette-actions hidden" id="paletteActions">
-            <button id="addColorBtn">Add Color</button>
-            <button id="loadPaletteBtn">Load Palette</button>
-            <button id="lockAllBtn">Lock All</button>
-            <button id="clearLocksBtn">Clear Locks</button>
-            <div class="matte-color-control">
-              <label for="matteColorInput" style="margin: 0"
-                >Alpha Matte:</label
-              >
-              <input
-                type="text"
-                id="matteColorInput"
-                value="#FFF"
-                placeholder="#FFF"
-                style="width: 80px"
-                title="Background color for transparent pixels (e.g., #FFF or #FFFFFF)"
-              />
+          <div class="palette hidden" id="paletteActions">
+            <div class="palette-display" id="paletteDisplay"></div>
+            <div class="palette-actions">
+              <button id="addColorBtn">Add Color</button>
+              <button id="loadPaletteBtn">Load Palette</button>
+              <button id="lockAllBtn">Lock All</button>
+              <button id="clearLocksBtn">Clear Locks</button>
+              <div class="matte-color-control">
+                <label for="matteColorInput" style="margin: 0"
+                  >Alpha Matte:</label
+                >
+                <input
+                  type="text"
+                  id="matteColorInput"
+                  value="#FFF"
+                  placeholder="#FFF"
+                  style="width: 80px"
+                  title="Background color for transparent pixels (e.g., #FFF or #FFFFFF)"
+                />
+              </div>
             </div>
+            <input
+              type="file"
+              id="paletteInput"
+              accept="image/png"
+              style="display: none"
+            />
           </div>
-          <input
-            type="file"
-            id="paletteInput"
-            accept="image/png"
-            style="display: none"
-          />
         </div>
       </div>
     </div>

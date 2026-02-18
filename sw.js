@@ -1,4 +1,4 @@
-const CACHE_NAME = 'amiga-convert-v1';
+const CACHE_NAME = 'amiga-convert-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -14,6 +14,8 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  // Take over immediately without waiting for old SW to stop
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
@@ -22,33 +24,41 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  // Take control of all clients immediately
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      );
-    })
+    Promise.all([
+      clients.claim(),
+      // Delete old caches
+      caches.keys().then((keys) => {
+        return Promise.all(
+          keys
+            .filter((key) => key !== CACHE_NAME)
+            .map((key) => caches.delete(key))
+        );
+      })
+    ])
   );
 });
 
 self.addEventListener('fetch', (event) => {
+  // Stale-while-revalidate strategy
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        // Cache successful responses for future offline use
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return response;
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.match(event.request).then((cachedResponse) => {
+        const fetchPromise = fetch(event.request).then((networkResponse) => {
+          // Update cache with fresh response
+          if (networkResponse.status === 200) {
+            cache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        }).catch(() => {
+          // Network failed, return cached version if available
+          return cachedResponse;
+        });
+
+        // Return cached response immediately, or wait for network
+        return cachedResponse || fetchPromise;
       });
-    }).catch(() => {
-      // Return cached version if network fails
-      return caches.match(event.request);
     })
   );
 });
