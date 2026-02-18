@@ -1,4 +1,4 @@
-const CACHE_NAME = 'amiga-convert-v2';
+const CACHE_NAME = 'amiga-convert-v3';
 const ASSETS = [
   '/',
   '/index.html',

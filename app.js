@@ -1874,10 +1874,10 @@ let currentIndexedData = null; // Store indexed pixel data for indexed PNG expor
 let flashInterval = null;
 let flashTimeout = null;
 let originalPreviewData = null;
+let draggedPaletteItem = null;
+let palettePixelCounts = new Map(); // Map from hex color to pixel count
 
 function displayPalette(palette) {
-  const paletteDisplay = document.getElementById("paletteDisplay");
-  paletteDisplay.innerHTML = "";
   currentPalette = palette;
 
   // Reset original preview data for flash effect
@@ -1893,24 +1893,43 @@ function displayPalette(palette) {
     previewCanvas.height,
   );
   const data = imageData.data;
-  const pixelCounts = new Array(palette.length).fill(0);
+
+  // Build pixel count map by color
+  palettePixelCounts.clear();
+  for (let i = 0; i < palette.length; i++) {
+    const c = palette[i];
+    const hexR = c.r.toString(16).padStart(2, "0");
+    const hexG = c.g.toString(16).padStart(2, "0");
+    const hexB = c.b.toString(16).padStart(2, "0");
+    const hexColor = `#${hexR}${hexG}${hexB}`.toUpperCase();
+    palettePixelCounts.set(hexColor, 0);
+  }
 
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i];
     const g = data[i + 1];
     const b = data[i + 2];
 
-    // Find which palette color this pixel uses
-    for (let j = 0; j < palette.length; j++) {
-      if (palette[j].r === r && palette[j].g === g && palette[j].b === b) {
-        pixelCounts[j]++;
-        break;
-      }
+    // Convert pixel to hex and increment count
+    const hexR = r.toString(16).padStart(2, "0");
+    const hexG = g.toString(16).padStart(2, "0");
+    const hexB = b.toString(16).padStart(2, "0");
+    const hexColor = `#${hexR}${hexG}${hexB}`.toUpperCase();
+
+    if (palettePixelCounts.has(hexColor)) {
+      palettePixelCounts.set(hexColor, palettePixelCounts.get(hexColor) + 1);
     }
   }
 
-  for (let i = 0; i < palette.length; i++) {
-    const color = palette[i];
+  renderPaletteDisplay();
+}
+
+function renderPaletteDisplay() {
+  const paletteDisplay = document.getElementById("paletteDisplay");
+  paletteDisplay.innerHTML = "";
+
+  for (let i = 0; i < currentPalette.length; i++) {
+    const color = currentPalette[i];
     const colorDiv = document.createElement("div");
     colorDiv.className = "palette-color";
     colorDiv.style.backgroundColor = `rgb(${color.r}, ${color.g}, ${color.b})`;
@@ -1929,7 +1948,7 @@ function displayPalette(palette) {
     const hex12bit = `#${r4bit}${g4bit}${b4bit}`.toUpperCase();
 
     // Format pixel count with thousands separator
-    const pixelCount = pixelCounts[i].toLocaleString();
+    const pixelCount = (palettePixelCounts.get(hexColor) || 0).toLocaleString();
     const tooltipText = `${hex12bit} • ${pixelCount} px`;
 
     colorDiv.setAttribute("data-rgb", tooltipText);
@@ -2064,12 +2083,66 @@ function displayPalette(palette) {
       }
     });
 
+    // Drag and drop for reordering
+    colorDiv.draggable = true;
+
+    colorDiv.addEventListener("dragstart", (e) => {
+      draggedPaletteItem = colorDiv;
+      colorDiv.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", i.toString());
+    });
+
+    colorDiv.addEventListener("dragend", () => {
+      colorDiv.classList.remove("dragging");
+      draggedPaletteItem = null;
+      // Remove any lingering drag-over classes
+      document.querySelectorAll(".palette-color.drag-over").forEach(el => {
+        el.classList.remove("drag-over");
+      });
+    });
+
+    colorDiv.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+    });
+
+    colorDiv.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      if (draggedPaletteItem && draggedPaletteItem !== colorDiv) {
+        colorDiv.classList.add("drag-over");
+      }
+    });
+
+    colorDiv.addEventListener("dragleave", () => {
+      colorDiv.classList.remove("drag-over");
+    });
+
+    colorDiv.addEventListener("drop", (e) => {
+      e.preventDefault();
+      colorDiv.classList.remove("drag-over");
+
+      if (!draggedPaletteItem || draggedPaletteItem === colorDiv) return;
+
+      const fromIndex = parseInt(draggedPaletteItem.dataset.index);
+      const toIndex = parseInt(colorDiv.dataset.index);
+
+      if (fromIndex === toIndex) return;
+
+      // Reorder the palette array
+      const [movedColor] = currentPalette.splice(fromIndex, 1);
+      currentPalette.splice(toIndex, 0, movedColor);
+
+      // Re-render the palette display with new order
+      renderPaletteDisplay();
+    });
+
     paletteDisplay.appendChild(colorDiv);
   }
 
   // Display locked colors that are not in the active palette (disabled state)
   const paletteColorSet = new Set(
-    palette.map((c) => {
+    currentPalette.map((c) => {
       const hexR = c.r.toString(16).padStart(2, "0");
       const hexG = c.g.toString(16).padStart(2, "0");
       const hexB = c.b.toString(16).padStart(2, "0");

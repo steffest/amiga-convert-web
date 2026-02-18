@@ -540,7 +540,7 @@ button:disabled {
   border-radius: 2px;
   border: 1px solid #404040;
   position: relative;
-  cursor: pointer;
+  cursor: grab;
 }
 
 .palette-color.locked {
@@ -569,6 +569,17 @@ button:disabled {
 
 .palette-color.locked:hover {
   border-color: #ff4a4a;
+}
+
+.palette-color.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.palette-color.drag-over {
+  border: 2px solid #4aff4a;
+  transform: scale(1.15);
+  z-index: 11;
 }
 
 .palette-color:hover::after {
