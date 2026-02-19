@@ -181,7 +181,9 @@ function applyCurves(imageData, curvesLUTs) {
 }
 
 // Apply adjustments (brightness, contrast, saturation, hue, gamma)
-function applyAdjustments(imageData, brightness, contrast, saturation, hue, gamma, curvesLUTs, alphaMode, alphaThreshold, matteColor) {
+// params: { brightness, contrast, saturation, hue, gamma, curvesLUTs, alphaMode, alphaThreshold, matteColor }
+function applyAdjustments(imageData, params) {
+  const { brightness, contrast, saturation, hue, gamma, curvesLUTs, alphaMode, alphaThreshold, matteColor } = params;
   const data = imageData.data;
 
   // Apply curves first
@@ -630,7 +632,9 @@ function selectBestLockedColors(imageData, lockedPalette, colorCount, metric) {
 }
 
 // Build palette
-function buildPalette(imageData, colorCount, method, metric, lockedColors) {
+// params: { colorCount, quantMethod, colorDistance, lockedColors }
+function buildPalette(imageData, params) {
+  const { colorCount, quantMethod: method, colorDistance: metric, lockedColors } = params;
   let palette;
 
   const lockedPalette = lockedColors.map(hex => {
@@ -803,7 +807,9 @@ function generateBayerMatrix(size) {
 }
 
 // Apply dithering
-function applyDithering(imageData, palette, method, amount, bayerSize, metric, errorDampening) {
+// params: { ditherMethod, ditherAmount, bayerSize, colorDistance, errorDampening }
+function applyDithering(imageData, palette, params) {
+  const { ditherMethod: method, ditherAmount: amount, bayerSize, colorDistance: metric, errorDampening } = params;
   const width = imageData.width;
   const height = imageData.height;
   const data = new Int16Array(imageData.data);
@@ -977,38 +983,13 @@ self.addEventListener('message', function(e) {
     );
 
     // Apply adjustments
-    const adjusted = applyAdjustments(
-      imgData,
-      params.brightness,
-      params.contrast,
-      params.saturation,
-      params.hue,
-      params.gamma,
-      params.curvesLUTs,
-      params.alphaMode,
-      params.alphaThreshold,
-      params.matteColor
-    );
+    const adjusted = applyAdjustments(imgData, params);
 
     // Build palette
-    const palette = buildPalette(
-      adjusted,
-      params.colorCount,
-      params.quantMethod,
-      params.colorDistance,
-      params.lockedColors
-    );
+    const palette = buildPalette(adjusted, params);
 
     // Apply dithering
-    const dithered = applyDithering(
-      adjusted,
-      palette,
-      params.ditherMethod,
-      params.ditherAmount,
-      params.bayerSize,
-      params.colorDistance,
-      params.errorDampening
-    );
+    const dithered = applyDithering(adjusted, palette, params);
 
     // Send result back
     self.postMessage({
