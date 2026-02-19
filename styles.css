@@ -400,9 +400,8 @@ button:disabled {
   cursor: crosshair;
 }
 
-/* Transparency checkerboard pattern */
-.transparency-grid,
-#originalWrapper .canvas-scroll canvas {
+/* Transparency checkerboard pattern - always visible, shows through transparent pixels */
+.canvas-scroll canvas {
   background-color: #ffffff;
   background-image:
     linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
@@ -531,9 +530,9 @@ button:disabled {
   cursor: crosshair;
 }
 
-/* Transparency checkerboard for slide reveal original */
+/* Transparency checkerboard for slide reveal canvases */
 #slideOriginalCanvas,
-#slidePreviewCanvas.transparency-grid {
+#slidePreviewCanvas {
   background-color: #ffffff;
   background-image:
     linear-gradient(45deg, #e0e0e0 25%, transparent 25%),

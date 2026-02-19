@@ -437,7 +437,7 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("imageInput").value = "";
 
   // Apply default settings (prevents browser form persistence)
-  applySettings(DEFAULT_SETTINGS, curvesEditor, updatePreviewTransparencyGrid);
+  applySettings(DEFAULT_SETTINGS, curvesEditor, null);
 
   // Reset window state
   window.sourceImage = null;
@@ -541,20 +541,11 @@ document
   .getElementById("matteColorInput")
   .addEventListener("change", convertImage);
 
-// Update transparency grid on preview canvases based on alpha mode
-function updatePreviewTransparencyGrid() {
-  const mode = document.getElementById("alphaMode").value;
-  const showGrid = mode === "threshold";
-  document.getElementById("previewCanvas").classList.toggle("transparency-grid", showGrid);
-  document.getElementById("slidePreviewCanvas").classList.toggle("transparency-grid", showGrid);
-}
-
 // Alpha mode toggle
 document.getElementById("alphaMode").addEventListener("change", (e) => {
   const mode = e.target.value;
   document.getElementById("alphaModeMatteOptions").style.display = mode === "matte" ? "flex" : "none";
   document.getElementById("alphaModeThresholdOptions").style.display = mode === "threshold" ? "flex" : "none";
-  updatePreviewTransparencyGrid();
   if (window.sourceImage) {
     convertImage();
   }
@@ -707,7 +698,7 @@ document.getElementById("loadSettingsBtn").addEventListener("click", async () =>
     try {
       const text = await file.text();
       const settings = JSON.parse(text);
-      if (applySettings(settings, curvesEditor, updatePreviewTransparencyGrid) && window.sourceImage) {
+      if (applySettings(settings, curvesEditor, null) && window.sourceImage) {
         convertImage();
       }
     } catch (e) {
@@ -724,7 +715,7 @@ document.getElementById("settingsInput").addEventListener("change", async (e) =>
   try {
     const text = await file.text();
     const settings = JSON.parse(text);
-    if (applySettings(settings, curvesEditor, updatePreviewTransparencyGrid) && window.sourceImage) {
+    if (applySettings(settings, curvesEditor, null) && window.sourceImage) {
       convertImage();
     }
   } catch (err) {
