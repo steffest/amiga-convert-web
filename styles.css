@@ -677,7 +677,7 @@ button:disabled {
   background: #252525;
   border-radius: 8px;
   padding: 20px;
-  width: 300px;
+  width: auto;
 }
 
 .add-color-content h3 {
@@ -697,6 +697,118 @@ button:disabled {
 
 .add-color-content button {
   flex: 1;
+}
+
+/* Color Picker */
+.color-picker {
+  margin-bottom: 12px;
+}
+
+.color-picker-main {
+  display: flex;
+  gap: 12px;
+}
+
+.picker-square-wrap {
+  position: relative;
+  cursor: crosshair;
+}
+
+.picker-square {
+  display: block;
+  border-radius: 4px;
+}
+
+.picker-square-cursor {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.picker-square-cursor.light {
+  border-color: rgba(0, 0, 0, 0.8);
+}
+
+.picker-hue-wrap {
+  position: relative;
+  cursor: crosshair;
+}
+
+.picker-hue {
+  display: block;
+  border-radius: 4px;
+}
+
+.picker-hue-cursor {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  height: 4px;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.8);
+  border-radius: 2px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.color-picker-swatches {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+}
+
+.color-picker-swatch {
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+}
+
+.color-picker-swatch:hover {
+  border-color: #4a9eff;
+  transform: scale(1.1);
+  z-index: 1;
+}
+
+.color-picker-input {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.color-picker-preview {
+  width: 40px;
+  height: 28px;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.color-picker-hex {
+  flex: 1;
+}
+
+.color-swatch-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.color-swatch-btn:hover {
+  border-color: #4a9eff;
 }
 
 .status {

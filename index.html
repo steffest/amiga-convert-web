@@ -448,6 +448,13 @@
                   <option value="threshold">Threshold</option>
                 </select>
                 <div class="alpha-matte-options" id="alphaModeMatteOptions">
+                  <button
+                    type="button"
+                    class="color-swatch-btn"
+                    id="matteColorBtn"
+                    style="background: #fff"
+                    title="Click to open color picker"
+                  ></button>
                   <input
                     type="text"
                     id="matteColorInput"
@@ -495,13 +502,52 @@
     <div class="add-color-modal" id="addColorModal">
       <div class="add-color-content">
         <h3>Add Custom Color</h3>
-        <label for="customColorInput"
-          >12-bit Hex Color (e.g., #F03 or #FF0033)</label
-        >
-        <input type="text" id="customColorInput" placeholder="#F03" />
+        <div class="color-picker" id="addColorPicker">
+          <div class="color-picker-main">
+            <div class="picker-square-wrap">
+              <canvas class="picker-square" width="256" height="256"></canvas>
+              <div class="picker-square-cursor"></div>
+            </div>
+            <div class="picker-hue-wrap">
+              <canvas class="picker-hue" width="20" height="256"></canvas>
+              <div class="picker-hue-cursor"></div>
+            </div>
+          </div>
+          <div class="color-picker-swatches"></div>
+          <div class="color-picker-input">
+            <div class="color-picker-preview"></div>
+            <input type="text" class="color-picker-hex" placeholder="#F03" />
+          </div>
+        </div>
         <div class="button-group">
           <button id="cancelAddColor">Cancel</button>
           <button id="confirmAddColor">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="add-color-modal" id="matteColorModal">
+      <div class="add-color-content">
+        <h3>Matte Color</h3>
+        <div class="color-picker" id="mattePickerInner">
+          <div class="color-picker-main">
+            <div class="picker-square-wrap">
+              <canvas class="picker-square" width="256" height="256"></canvas>
+              <div class="picker-square-cursor"></div>
+            </div>
+            <div class="picker-hue-wrap">
+              <canvas class="picker-hue" width="20" height="256"></canvas>
+              <div class="picker-hue-cursor"></div>
+            </div>
+          </div>
+          <div class="color-picker-swatches"></div>
+          <div class="color-picker-input">
+            <div class="color-picker-preview"></div>
+            <input type="text" class="color-picker-hex" placeholder="#FFF" />
+          </div>
+        </div>
+        <div class="button-group">
+          <button id="matteColorClose">Done</button>
         </div>
       </div>
     </div>

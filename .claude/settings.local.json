@@ -3,7 +3,10 @@
     "allow": [
       "Bash(sed:*)",
       "Bash(/Users/BatesGW1/projects/amiga-convert-web/styles.css)",
-      "Bash(/Users/BatesGW1/projects/amiga-convert-web/app.js)"
+      "Bash(/Users/BatesGW1/projects/amiga-convert-web/app.js)",
+      "Bash(rsvg-convert:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
