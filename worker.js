@@ -363,8 +363,8 @@ function medianCut(pixels, colorCount) {
   });
 }
 
-// Wu quantization
-function wuQuantization(imageData, colorCount, metric) {
+// Median cut wrapper - extracts pixels from imageData and calls medianCut
+function medianCutQuantization(imageData, colorCount, metric) {
   const data = imageData.data;
   const pixels = [];
 
@@ -378,6 +378,146 @@ function wuQuantization(imageData, colorCount, metric) {
   }
 
   return medianCut(pixels, colorCount);
+}
+
+// Wu quantization - variance-based box splitting
+// Unlike median cut which splits by range, Wu's algorithm minimizes variance
+function wuQuantization(imageData, colorCount, metric) {
+  const data = imageData.data;
+  const pixels = [];
+
+  // Sample pixels from image
+  const step = Math.max(1, Math.floor(data.length / (4 * 10000)));
+  for (let i = 0; i < data.length; i += 4 * step) {
+    pixels.push({
+      r: quantize4bit(data[i]),
+      g: quantize4bit(data[i + 1]),
+      b: quantize4bit(data[i + 2]),
+    });
+  }
+
+  if (pixels.length === 0) {
+    return [{ r: 0, g: 0, b: 0 }];
+  }
+
+  // Calculate variance for a set of pixels
+  function calculateVariance(pixelSet) {
+    if (pixelSet.length === 0) return 0;
+
+    let sumR = 0, sumG = 0, sumB = 0;
+    let sumR2 = 0, sumG2 = 0, sumB2 = 0;
+
+    for (const p of pixelSet) {
+      sumR += p.r;
+      sumG += p.g;
+      sumB += p.b;
+      sumR2 += p.r * p.r;
+      sumG2 += p.g * p.g;
+      sumB2 += p.b * p.b;
+    }
+
+    const n = pixelSet.length;
+    const varR = (sumR2 / n) - (sumR / n) * (sumR / n);
+    const varG = (sumG2 / n) - (sumG / n) * (sumG / n);
+    const varB = (sumB2 / n) - (sumB / n) * (sumB / n);
+
+    // Total variance weighted by pixel count
+    return (varR + varG + varB) * n;
+  }
+
+  // Find best split point for a box using variance minimization
+  function findBestSplit(box) {
+    const pixelSet = box.pixels;
+    if (pixelSet.length < 2) return null;
+
+    let bestAxis = null;
+    let bestSplitIdx = -1;
+    let bestVarianceReduction = -1;
+    const currentVariance = calculateVariance(pixelSet);
+
+    // Try splitting along each axis
+    for (const axis of ['r', 'g', 'b']) {
+      // Sort by this axis
+      const sorted = [...pixelSet].sort((a, b) => a[axis] - b[axis]);
+
+      // Try each split point
+      for (let i = 1; i < sorted.length; i++) {
+        // Skip if same value (no actual split)
+        if (sorted[i][axis] === sorted[i - 1][axis]) continue;
+
+        const left = sorted.slice(0, i);
+        const right = sorted.slice(i);
+
+        const leftVar = calculateVariance(left);
+        const rightVar = calculateVariance(right);
+        const newVariance = leftVar + rightVar;
+        const reduction = currentVariance - newVariance;
+
+        if (reduction > bestVarianceReduction) {
+          bestVarianceReduction = reduction;
+          bestAxis = axis;
+          bestSplitIdx = i;
+        }
+      }
+    }
+
+    if (bestAxis === null) return null;
+
+    return { axis: bestAxis, splitIdx: bestSplitIdx, varianceReduction: bestVarianceReduction };
+  }
+
+  // Initialize with one box containing all pixels
+  let boxes = [{ pixels: pixels, variance: calculateVariance(pixels) }];
+
+  // Split until we have enough colors
+  while (boxes.length < colorCount) {
+    // Find the box with the best possible split (highest variance reduction)
+    let bestBoxIdx = -1;
+    let bestSplit = null;
+    let bestReduction = -1;
+
+    for (let i = 0; i < boxes.length; i++) {
+      if (boxes[i].pixels.length < 2) continue;
+
+      const split = findBestSplit(boxes[i]);
+      if (split && split.varianceReduction > bestReduction) {
+        bestReduction = split.varianceReduction;
+        bestBoxIdx = i;
+        bestSplit = split;
+      }
+    }
+
+    // No more splits possible
+    if (bestBoxIdx === -1 || bestSplit === null) break;
+
+    // Perform the split
+    const box = boxes[bestBoxIdx];
+    const sorted = [...box.pixels].sort((a, b) => a[bestSplit.axis] - b[bestSplit.axis]);
+
+    const box1Pixels = sorted.slice(0, bestSplit.splitIdx);
+    const box2Pixels = sorted.slice(bestSplit.splitIdx);
+
+    const box1 = { pixels: box1Pixels, variance: calculateVariance(box1Pixels) };
+    const box2 = { pixels: box2Pixels, variance: calculateVariance(box2Pixels) };
+
+    boxes.splice(bestBoxIdx, 1, box1, box2);
+  }
+
+  // Convert boxes to palette colors (average of each box)
+  return boxes.map((box) => {
+    let r = 0, g = 0, b = 0;
+    for (const pixel of box.pixels) {
+      r += pixel.r;
+      g += pixel.g;
+      b += pixel.b;
+    }
+    const count = box.pixels.length;
+    return {
+      r: quantize4bit(Math.round(r / count)),
+      g: quantize4bit(Math.round(g / count)),
+      b: quantize4bit(Math.round(b / count)),
+    };
+  });
 }
 
 // Seeded random for NeuQuant
@@ -658,7 +798,7 @@ function buildPalette(imageData, params) {
 
   switch (method) {
     case "median-cut":
-      palette = wuQuantization(imageData, remainingColors, metric);
+      palette = medianCutQuantization(imageData, remainingColors, metric);
       break;
     case "wuquant":
       palette = wuQuantization(imageData, remainingColors, metric);

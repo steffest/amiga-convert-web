@@ -1,14 +1,43 @@
 // Color Picker UI component
 
+/**
+ * @typedef {Object} ColorPickerInstance
+ * @property {HTMLElement} container - Container element
+ * @property {function(number, number, number): void} onChange - Color change callback
+ * @property {number[]} hsv - Current color as [h, s, v] (0-1 range)
+ * @property {HTMLCanvasElement} squareCanvas - Saturation/value picker canvas
+ * @property {HTMLElement} squareCursor - Cursor element for square picker
+ * @property {HTMLCanvasElement} hueCanvas - Hue strip canvas
+ * @property {HTMLElement} hueCursor - Cursor element for hue strip
+ * @property {HTMLElement|null} swatchesContainer - Container for color swatches
+ * @property {HTMLInputElement|null} hexInput - Hex color input field
+ * @property {HTMLElement|null} preview - Color preview element
+ * @property {function(): void} drawSquare - Redraw the saturation/value square
+ */
+
+/**
+ * Color Picker UI component for selecting 12-bit Amiga colors
+ * Provides HSV-based color selection with saturation/value square and hue strip.
+ * All colors are quantized to 12-bit (4 bits per channel).
+ */
 export const ColorPicker = {
-  // Swatches - 3 rows of 12-bit colors
+  /**
+   * Preset color swatches - 3 rows of 12-bit colors (3-digit hex)
+   * @type {string[][]}
+   */
   swatches: [
     ['444', '999', 'fff', 'f43', 'f90', 'fd0', 'dd0', 'ad0', '6cc', '7df', 'aaf', 'faf'],
     ['333', '888', 'ccc', 'd31', 'e70', 'fc0', 'bb0', '6b0', '1aa', '09e', '76f', 'f2f'],
     ['000', '666', 'bbb', '900', 'c50', 'f90', '880', '143', '077', '06b', '639', 'a19'],
   ],
 
-  // Convert RGB [0-255] to HSV [0-1]
+  /**
+   * Convert RGB values to HSV
+   * @param {number} r - Red (0-255)
+   * @param {number} g - Green (0-255)
+   * @param {number} b - Blue (0-255)
+   * @returns {number[]} HSV values as [h, s, v] (0-1 range)
+   */
   rgbToHsv(r, g, b) {
     r /= 255; g /= 255; b /= 255;
     const max = Math.max(r, g, b);
@@ -28,7 +57,13 @@ export const ColorPicker = {
     return [h, s, v];
   },
 
-  // Convert HSV [0-1] to RGB [0-255]
+  /**
+   * Convert HSV values to RGB
+   * @param {number} h - Hue (0-1)
+   * @param {number} s - Saturation (0-1)
+   * @param {number} v - Value (0-1)
+   * @returns {number[]} RGB values as [r, g, b] (0-255)
+   */
   hsvToRgb(h, s, v) {
     let r, g, b;
     const i = Math.floor(h * 6);
@@ -47,7 +82,13 @@ export const ColorPicker = {
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
   },
 
-  // Quantize to 12-bit (4 bits per channel)
+  /**
+   * Quantize RGB to 12-bit color (4 bits per channel)
+   * @param {number} r - Red (0-255)
+   * @param {number} g - Green (0-255)
+   * @param {number} b - Blue (0-255)
+   * @returns {number[]} Quantized RGB as [r, g, b] (values: 0, 17, 34, ... 255)
+   */
   quantize12bit(r, g, b) {
     const r4 = Math.round(r / 17);
     const g4 = Math.round(g / 17);
@@ -55,7 +96,11 @@ export const ColorPicker = {
     return [r4 * 17, g4 * 17, b4 * 17];
   },
 
-  // Parse hex string to RGB
+  /**
+   * Parse hex color string to RGB values
+   * @param {string} hex - Hex color (#RGB or #RRGGBB, # optional)
+   * @returns {number[]|null} RGB as [r, g, b] or null if invalid
+   */
   parseHex(hex) {
     hex = hex.replace('#', '').toUpperCase();
     if (hex.length === 3) {
@@ -74,7 +119,13 @@ export const ColorPicker = {
     return null;
   },
 
-  // Convert RGB to 3-digit hex
+  /**
+   * Convert RGB to 3-digit hex string (12-bit color)
+   * @param {number} r - Red (0-255)
+   * @param {number} g - Green (0-255)
+   * @param {number} b - Blue (0-255)
+   * @returns {string} Hex string like "#F0A"
+   */
   rgbToHex3(r, g, b) {
     const r4 = Math.round(r / 17).toString(16);
     const g4 = Math.round(g / 17).toString(16);
@@ -82,12 +133,28 @@ export const ColorPicker = {
     return `#${r4}${g4}${b4}`.toUpperCase();
   },
 
-  // Calculate luminance
+  /**
+   * Calculate perceived luminance
+   * @param {number} r - Red (0-255)
+   * @param {number} g - Green (0-255)
+   * @param {number} b - Blue (0-255)
+   * @returns {number} Luminance (0-255)
+   */
   luminance(r, g, b) {
     return 0.299 * r + 0.587 * g + 0.114 * b;
   },
 
-  // Create a picker instance
+  /**
+   * Create a new color picker instance
+   * @param {HTMLElement} container - Container element with picker structure
+   * @param {function(number, number, number): void} onChange - Callback when color changes
+   * @returns {ColorPickerInstance} The picker instance
+   * @example
+   * const picker = ColorPicker.create(
+   *   document.getElementById('myPicker'),
+   *   (r, g, b) => console.log(`Selected: rgb(${r}, ${g}, ${b})`)
+   * );
+   */
   create(container, onChange) {
     const picker = {
       container,
@@ -114,6 +181,11 @@ export const ColorPicker = {
     return picker;
   },
 
+  /**
+   * Initialize the saturation/value square canvas
+   * @param {ColorPickerInstance} picker - Picker instance
+   * @private
+   */
   initSquare(picker) {
     const canvas = picker.squareCanvas;
     const ctx = canvas.getContext('2d');
@@ -163,6 +235,11 @@ export const ColorPicker = {
     });
   },
 
+  /**
+   * Initialize the hue strip canvas
+   * @param {ColorPickerInstance} picker - Picker instance
+   * @private
+   */
   initHue(picker) {
     const canvas = picker.hueCanvas;
     const ctx = canvas.getContext('2d');
@@ -197,6 +274,11 @@ export const ColorPicker = {
     });
   },
 
+  /**
+   * Initialize the color swatches
+   * @param {ColorPickerInstance} picker - Picker instance
+   * @private
+   */
   initSwatches(picker) {
     if (!picker.swatchesContainer) return;
     picker.swatchesContainer.innerHTML = '';
@@ -212,6 +294,11 @@ export const ColorPicker = {
     });
   },
 
+  /**
+   * Initialize the hex input field
+   * @param {ColorPickerInstance} picker - Picker instance
+   * @private
+   */
   initHexInput(picker) {
     if (!picker.hexInput) return;
     picker.hexInput.addEventListener('input', () => {
@@ -227,6 +314,11 @@ export const ColorPicker = {
     });
   },
 
+  /**
+   * Set the picker to a specific color
+   * @param {ColorPickerInstance} picker - Picker instance
+   * @param {number[]} rgb - RGB color as [r, g, b]
+   */
   setColor(picker, [r, g, b]) {
     [r, g, b] = this.quantize12bit(r, g, b);
     picker.hsv = this.rgbToHsv(r, g, b);
@@ -239,6 +331,11 @@ export const ColorPicker = {
     picker.onChange(r, g, b);
   },
 
+  /**
+   * Update color from current HSV values
+   * @param {ColorPickerInstance} picker - Picker instance
+   * @private
+   */
   updateFromHsv(picker) {
     let [r, g, b] = this.hsvToRgb(...picker.hsv);
     [r, g, b] = this.quantize12bit(r, g, b);
@@ -250,6 +347,11 @@ export const ColorPicker = {
     picker.onChange(r, g, b);
   },
 
+  /**
+   * Update cursor positions based on current HSV
+   * @param {ColorPickerInstance} picker - Picker instance
+   * @private
+   */
   updateCursors(picker) {
     const [h, s, v] = picker.hsv;
     const [r, g, b] = this.hsvToRgb(h, s, v);
@@ -264,12 +366,25 @@ export const ColorPicker = {
     picker.hueCursor.style.top = `${h * 100}%`;
   },
 
+  /**
+   * Update the color preview element
+   * @param {ColorPickerInstance} picker - Picker instance
+   * @param {number} r - Red (0-255)
+   * @param {number} g - Green (0-255)
+   * @param {number} b - Blue (0-255)
+   * @private
+   */
   updatePreview(picker, r, g, b) {
     if (picker.preview) {
       picker.preview.style.background = `rgb(${r}, ${g}, ${b})`;
     }
   },
 
+  /**
+   * Get the current color from a picker instance
+   * @param {ColorPickerInstance} picker - Picker instance
+   * @returns {number[]} RGB as [r, g, b] (quantized to 12-bit)
+   */
   getColor(picker) {
     let [r, g, b] = this.hsvToRgb(...picker.hsv);
     return this.quantize12bit(r, g, b);

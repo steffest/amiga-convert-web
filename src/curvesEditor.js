@@ -1,6 +1,34 @@
 // Curves Editor UI component
 
-// Create curves editor - requires a convertImage callback for real-time updates
+/**
+ * @typedef {Object} CurvesEditor
+ * @property {HTMLCanvasElement} canvas - The curves canvas element
+ * @property {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @property {string} currentChannel - Active channel ('rgb', 'red', 'green', 'blue')
+ * @property {Object} curves - Curve control points for each channel
+ * @property {Array<[number, number]>} curves.rgb - RGB curve points
+ * @property {Array<[number, number]>} curves.red - Red curve points
+ * @property {Array<[number, number]>} curves.green - Green curve points
+ * @property {Array<[number, number]>} curves.blue - Blue curve points
+ * @property {Object|null} histogram - Histogram data for each channel
+ * @property {number|null} draggingPoint - Index of point being dragged
+ * @property {number|null} selectedPoint - Index of selected point
+ * @property {function(): void} init - Initialize the editor
+ * @property {function(ImageData): void} calculateHistogram - Calculate histogram from image
+ * @property {function(): void} draw - Redraw the curves canvas
+ * @property {function(ImageData): ImageData} applyCurves - Apply curves to image data
+ * @property {function(): Object} getCurvesLUTs - Get lookup tables for all channels
+ * @property {function(number, number, number): {r: number, g: number, b: number}} applyToPixel - Apply curves to single pixel
+ */
+
+/**
+ * Create a curves editor instance for adjusting image tonal curves
+ * @param {function(): void} convertImageCallback - Callback to trigger image reconversion
+ * @returns {CurvesEditor} The curves editor instance
+ * @example
+ * const curvesEditor = createCurvesEditor(() => convertImage());
+ * curvesEditor.init();
+ */
 export function createCurvesEditor(convertImageCallback) {
   const curvesEditor = {
     canvas: null,
@@ -28,6 +56,9 @@ export function createCurvesEditor(convertImageCallback) {
     draggingPoint: null,
     selectedPoint: null,
 
+    /**
+     * Initialize the curves editor, binds event listeners
+     */
     init() {
       this.canvas = document.getElementById("curvesCanvas");
       this.ctx = this.canvas.getContext("2d");
@@ -106,6 +137,10 @@ export function createCurvesEditor(convertImageCallback) {
       this.draw();
     },
 
+    /**
+     * Calculate histogram from image data
+     * @param {ImageData} imageData - Source image data
+     */
     calculateHistogram(imageData) {
       const data = imageData.data;
       const hist = {
@@ -142,6 +177,12 @@ export function createCurvesEditor(convertImageCallback) {
       this.draw();
     },
 
+    /**
+     * Get mouse position relative to canvas
+     * @param {MouseEvent} e - Mouse event
+     * @returns {{x: number, y: number}} Canvas coordinates
+     * @private
+     */
     getMousePos(e) {
       const rect = this.canvas.getBoundingClientRect();
       const scaleX = this.canvas.width / rect.width;
@@ -152,6 +193,13 @@ export function createCurvesEditor(convertImageCallback) {
       };
     },
 
+    /**
+     * Convert canvas coordinates to curve input/output values
+     * @param {number} x - Canvas X coordinate
+     * @param {number} y - Canvas Y coordinate
+     * @returns {{input: number, output: number}} Curve values (0-255)
+     * @private
+     */
     canvasToValue(x, y) {
       const padding = 20;
       const width = this.canvas.width - padding * 2;
@@ -162,6 +210,13 @@ export function createCurvesEditor(convertImageCallback) {
       };
     },
 
+    /**
+     * Convert curve input/output values to canvas coordinates
+     * @param {number} input - Input value (0-255)
+     * @param {number} output - Output value (0-255)
+     * @returns {{x: number, y: number}} Canvas coordinates
+     * @private
+     */
     valueToCanvas(input, output) {
       const padding = 20;
       const width = this.canvas.width - padding * 2;
@@ -172,6 +227,11 @@ export function createCurvesEditor(convertImageCallback) {
       };
     },
 
+    /**
+     * Handle mouse down - select or create control point
+     * @param {MouseEvent} e - Mouse event
+     * @private
+     */
     onMouseDown(e) {
       const pos = this.getMousePos(e);
       const curve = this.curves[this.currentChannel];
@@ -210,6 +270,11 @@ export function createCurvesEditor(convertImageCallback) {
       }
     },
 
+    /**
+     * Handle mouse move - drag control point
+     * @param {MouseEvent} e - Mouse event
+     * @private
+     */
     onMouseMove(e) {
       if (this.draggingPoint === null) return;
 
@@ -236,11 +301,20 @@ export function createCurvesEditor(convertImageCallback) {
       convertImageCallback(); // Immediate, pending logic handles rapid calls
     },
 
+    /**
+     * Handle mouse up - finish dragging
+     * @private
+     */
     onMouseUp() {
       this.draggingPoint = null;
       convertImageCallback(); // Final update when released
     },
 
+    /**
+     * Handle double click - delete control point
+     * @param {MouseEvent} e - Mouse event
+     * @private
+     */
     onDoubleClick(e) {
       const pos = this.getMousePos(e);
       const curve = this.curves[this.currentChannel];
@@ -258,6 +332,13 @@ export function createCurvesEditor(convertImageCallback) {
       }
     },
 
+    /**
+     * Interpolate curve points to create a 256-value lookup table
+     * Uses Catmull-Rom spline interpolation for smooth curves
+     * @param {Array<[number, number]>} curve - Control points [[input, output], ...]
+     * @returns {number[]} 256-element lookup table
+     * @private
+     */
     interpolateCurve(curve) {
       const lut = new Array(256);
 
@@ -349,6 +430,9 @@ export function createCurvesEditor(convertImageCallback) {
       return lut;
     },
 
+    /**
+     * Draw the curves editor UI
+     */
     draw() {
       const ctx = this.ctx;
       const width = this.canvas.width;
@@ -502,6 +586,11 @@ export function createCurvesEditor(convertImageCallback) {
       }
     },
 
+    /**
+     * Apply curves adjustment to image data
+     * @param {ImageData} imageData - Source image data (modified in place)
+     * @returns {ImageData} The modified image data
+     */
     applyCurves(imageData) {
       const data = imageData.data;
       const rgbLut = this.interpolateCurve(this.curves.rgb);
@@ -518,12 +607,32 @@ export function createCurvesEditor(convertImageCallback) {
       return imageData;
     },
 
+    /**
+     * Get lookup tables for all curve channels
+     * @returns {{rgb: number[], red: number[], green: number[], blue: number[]}} LUTs for each channel
+     */
     getCurvesLUTs() {
       return {
         rgb: this.interpolateCurve(this.curves.rgb),
         red: this.interpolateCurve(this.curves.red),
         green: this.interpolateCurve(this.curves.green),
         blue: this.interpolateCurve(this.curves.blue),
+      };
+    },
+
+    /**
+     * Apply curves to a single pixel (for color picker preview)
+     * @param {number} r - Red channel (0-255)
+     * @param {number} g - Green channel (0-255)
+     * @param {number} b - Blue channel (0-255)
+     * @returns {{r: number, g: number, b: number}} Adjusted RGB values
+     */
+    applyToPixel(r, g, b) {
+      const luts = this.getCurvesLUTs();
+      return {
+        r: luts.red[luts.rgb[r]],
+        g: luts.green[luts.rgb[g]],
+        b: luts.blue[luts.rgb[b]],
       };
     },
   };

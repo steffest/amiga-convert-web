@@ -8,6 +8,7 @@ import { quantize4bit, rgbToHex } from './src/colorUtils.js';
 import { createPaletteDisplay } from './src/paletteDisplay.js';
 import { createIndexedPNG } from './src/pngExport.js';
 import {
+  DEFAULT_SETTINGS,
   gatherSettings,
   applySettings,
   getAdjustmentValues,
@@ -435,35 +436,8 @@ window.addEventListener("DOMContentLoaded", () => {
   // Clear any persisted file input
   document.getElementById("imageInput").value = "";
 
-  // Reset adjustment controls to default values (prevents browser form persistence)
-  document.getElementById("brightness").value = 0;
-  document.getElementById("brightnessNumber").value = 0;
-  document.getElementById("contrast").value = 0;
-  document.getElementById("contrastNumber").value = 0;
-  document.getElementById("saturation").value = 0;
-  document.getElementById("saturationNumber").value = 0;
-  document.getElementById("hue").value = 0;
-  document.getElementById("hueNumber").value = 0;
-  document.getElementById("gamma").value = 1;
-  document.getElementById("gammaNumber").value = 1;
-
-  // Reset conversion controls to default values
-  document.getElementById("colors").value = 32;
-  document.getElementById("colorsNumber").value = 32;
-  document.getElementById("ditherAmount").value = 0.5;
-  document.getElementById("ditherAmountNumber").value = 0.5;
-  document.getElementById("ditherMethod").value = "floyd-steinberg";
-  document.getElementById("quantMethod").value = "rgbquant";
-  document.getElementById("colorDistance").value = "rgb-euclidean";
-  document.getElementById("matteColorInput").value = "#fff";
-  document.getElementById("errorDampeningEnabled").checked = false;
-  document.getElementById("errorDampeningThreshold").value = 48;
-  document.getElementById("errorDampeningThresholdNumber").value = 48;
-
-  // Set initial visibility for conditional controls
-  document.getElementById("bayerSizeControl").style.display = "none";
-  document.getElementById("ditherAmountControl").style.display = "block";
-  document.getElementById("errorDampeningControl").style.display = "block";
+  // Apply default settings (prevents browser form persistence)
+  applySettings(DEFAULT_SETTINGS, curvesEditor, updatePreviewTransparencyGrid);
 
   // Reset window state
   window.sourceImage = null;

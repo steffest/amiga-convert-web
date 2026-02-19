@@ -1,7 +1,73 @@
 // Settings save/load manager
 
-// Shared helper functions to read settings from DOM
+/**
+ * Default settings for initializing the application
+ * @type {Settings}
+ */
+export const DEFAULT_SETTINGS = {
+  version: 1,
+  conversion: {
+    colors: 32,
+    quantMethod: 'rgbquant',
+    colorDistance: 'rgb-euclidean',
+    ditherMethod: 'floyd-steinberg',
+    bayerSize: 4,
+    ditherAmount: 0.5,
+    errorDampeningEnabled: false,
+    errorDampeningThreshold: 48,
+  },
+  curves: {
+    rgb: [[0, 0], [255, 255]],
+    red: [[0, 0], [255, 255]],
+    green: [[0, 0], [255, 255]],
+    blue: [[0, 0], [255, 255]],
+  },
+  adjustments: {
+    brightness: 0,
+    contrast: 0,
+    saturation: 0,
+    hue: 0,
+    gamma: 1,
+  },
+  alpha: {
+    mode: 'matte',
+    threshold: 128,
+    matteColor: '#FFF',
+  },
+};
 
+/**
+ * @typedef {Object} AdjustmentValues
+ * @property {number} brightness - Brightness adjustment (-100 to 100)
+ * @property {number} contrast - Contrast adjustment (-100 to 100)
+ * @property {number} saturation - Saturation adjustment (-100 to 100)
+ * @property {number} hue - Hue rotation in degrees (-180 to 180)
+ * @property {number} gamma - Gamma correction (0.1 to 3.0)
+ */
+
+/**
+ * @typedef {Object} ConversionValues
+ * @property {number} colorCount - Number of colors in palette (2-256)
+ * @property {string} quantMethod - Quantization method ('median-cut', 'wu', 'neuquant', 'rgb-quant')
+ * @property {string} colorDistance - Color distance metric ('rgb-euclidean', 'weighted-rgb', 'redmean', 'cie76-lab')
+ * @property {string} ditherMethod - Dithering algorithm ('none', 'ordered', 'floyd-steinberg', etc.)
+ * @property {number} ditherAmount - Dithering intensity (0.0 to 1.0)
+ * @property {number} bayerSize - Bayer matrix size for ordered dithering (2, 4, 8, 16)
+ * @property {boolean} errorDampeningEnabled - Whether error dampening is enabled
+ * @property {number} errorDampeningThreshold - Error dampening threshold (0-255)
+ */
+
+/**
+ * @typedef {Object} AlphaValues
+ * @property {string} mode - Alpha handling mode ('matte', 'threshold')
+ * @property {number} threshold - Alpha threshold for threshold mode (0-255)
+ * @property {string} matteColorHex - Matte color as hex string (#RGB or #RRGGBB)
+ */
+
+/**
+ * Get current image adjustment values from DOM
+ * @returns {AdjustmentValues} Current adjustment settings
+ */
 export function getAdjustmentValues() {
   return {
     brightness: parseInt(document.getElementById("brightness").value),
@@ -12,6 +78,10 @@ export function getAdjustmentValues() {
   };
 }
 
+/**
+ * Get current conversion settings from DOM
+ * @returns {ConversionValues} Current conversion settings
+ */
 export function getConversionValues() {
   return {
     colorCount: parseInt(document.getElementById("colors").value),
@@ -25,6 +95,10 @@ export function getConversionValues() {
   };
 }
 
+/**
+ * Get current alpha/transparency settings from DOM
+ * @returns {AlphaValues} Current alpha settings
+ */
 export function getAlphaValues() {
   return {
     mode: document.getElementById("alphaMode").value,
@@ -33,7 +107,14 @@ export function getAlphaValues() {
   };
 }
 
-// Parse matte color hex to RGB object (supports #FFF or #FFFFFF)
+/**
+ * Parse hex color string to RGB object
+ * @param {string} hex - Hex color string (#RGB or #RRGGBB)
+ * @returns {{r: number, g: number, b: number}} RGB color object
+ * @example
+ * parseMatteColor('#F00')    // { r: 255, g: 0, b: 0 }
+ * parseMatteColor('#FF0000') // { r: 255, g: 0, b: 0 }
+ */
 export function parseMatteColor(hex) {
   hex = hex.trim();
   if (hex.match(/^#[0-9A-Fa-f]{3}$/)) {
@@ -55,6 +136,20 @@ export function parseMatteColor(hex) {
   return { r: 255, g: 255, b: 255 };
 }
 
+/**
+ * @typedef {Object} Settings
+ * @property {number} version - Settings format version
+ * @property {Object} conversion - Conversion settings
+ * @property {Object} curves - Curve control points for each channel
+ * @property {AdjustmentValues} adjustments - Image adjustments
+ * @property {Object} alpha - Alpha/transparency settings
+ */
+
+/**
+ * Gather all current settings into a serializable object
+ * @param {Object} curvesEditor - The curves editor instance
+ * @returns {Settings} Complete settings object
+ */
 export function gatherSettings(curvesEditor) {
   const adj = getAdjustmentValues();
   const conv = getConversionValues();
@@ -87,6 +182,13 @@ export function gatherSettings(curvesEditor) {
   };
 }
 
+/**
+ * Apply loaded settings to the UI and curves editor
+ * @param {Settings} settings - Settings object to apply
+ * @param {Object} curvesEditor - The curves editor instance
+ * @param {function(): void} [updateTransparencyGridCallback] - Optional callback to update transparency grid
+ * @returns {boolean} True if settings were applied successfully
+ */
 export function applySettings(settings, curvesEditor, updateTransparencyGridCallback) {
   if (!settings || typeof settings !== 'object') {
     alert('Invalid settings file');

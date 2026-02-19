@@ -1,6 +1,11 @@
 // Indexed PNG export functionality
 
-// CRC32 calculation
+/**
+ * Calculate CRC32 checksum for PNG chunk validation
+ * @param {Uint8Array} data - Input data
+ * @returns {number} CRC32 checksum
+ * @private
+ */
 function crc32(data) {
   let crc = -1;
   for (let i = 0; i < data.length; i++) {
@@ -12,7 +17,13 @@ function crc32(data) {
   return crc ^ -1;
 }
 
-// Create a PNG chunk
+/**
+ * Create a PNG chunk with type, data, and CRC
+ * @param {string} type - 4-character chunk type (e.g., 'IHDR', 'PLTE', 'IDAT')
+ * @param {Uint8Array} data - Chunk data
+ * @returns {Uint8Array} Complete chunk including length, type, data, and CRC
+ * @private
+ */
 function createChunk(type, data) {
   const len = data.length;
   const buf = new Uint8Array(len + 12);
@@ -37,7 +48,28 @@ function createChunk(type, data) {
   return buf;
 }
 
-// Create indexed PNG manually
+/**
+ * @typedef {Object} PaletteColor
+ * @property {number} r - Red channel (0-255)
+ * @property {number} g - Green channel (0-255)
+ * @property {number} b - Blue channel (0-255)
+ */
+
+/**
+ * Create an indexed PNG file with a color palette
+ * Uses 8-bit indexed color (color type 3) with up to 256 colors
+ * @param {number} width - Image width in pixels
+ * @param {number} height - Image height in pixels
+ * @param {Uint8Array} indexedData - Pixel data as palette indices (0-255)
+ * @param {PaletteColor[]} palette - Array of RGB colors
+ * @returns {Uint8Array} Complete PNG file as byte array
+ * @example
+ * const png = createIndexedPNG(320, 200, pixelIndices, [
+ *   { r: 0, g: 0, b: 0 },
+ *   { r: 255, g: 255, b: 255 }
+ * ]);
+ * const blob = new Blob([png], { type: 'image/png' });
+ */
 export function createIndexedPNG(width, height, indexedData, palette) {
   // PNG signature
   const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);

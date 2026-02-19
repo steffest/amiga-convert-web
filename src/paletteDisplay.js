@@ -2,14 +2,57 @@
 
 import { rgbToHex } from './colorUtils.js';
 
-// State variables
+/** @type {number|null} Interval ID for color flashing effect */
 let flashInterval = null;
+/** @type {number|null} Timeout ID for flash delay */
 let flashTimeout = null;
+/** @type {Uint8ClampedArray|null} Original preview data for restoring after flash */
 let originalPreviewData = null;
+/** @type {HTMLElement|null} Currently dragged palette item */
 let draggedPaletteItem = null;
+/** @type {Map<string, number>} Pixel count for each color in the palette */
 let palettePixelCounts = new Map();
 
-// Create palette display manager
+/**
+ * @typedef {Object} PaletteColor
+ * @property {number} r - Red channel (0-255)
+ * @property {number} g - Green channel (0-255)
+ * @property {number} b - Blue channel (0-255)
+ */
+
+/**
+ * @typedef {Object} PaletteDisplayOptions
+ * @property {function(): PaletteColor[]} getCurrentPalette - Get current palette array
+ * @property {function(PaletteColor[]): void} setCurrentPalette - Set current palette
+ * @property {function(): Set<string>} getLockedColors - Get set of locked color hex strings
+ * @property {function(): void} convertImageCallback - Callback to trigger image reconversion
+ */
+
+/**
+ * @typedef {Object} PaletteDisplay
+ * @property {function(PaletteColor[]): void} displayPalette - Display a palette and count pixels
+ * @property {function(): void} renderPaletteDisplay - Render the palette UI
+ */
+
+/**
+ * Create a palette display manager for showing and interacting with color palettes
+ * Features:
+ * - Displays palette colors with pixel counts
+ * - Click to lock/unlock colors
+ * - Hover to flash pixels of that color in preview
+ * - Drag and drop to reorder colors
+ * - Shows locked colors not in current palette as disabled
+ *
+ * @param {PaletteDisplayOptions} options - Configuration options
+ * @returns {PaletteDisplay} Palette display manager instance
+ * @example
+ * const paletteDisplay = createPaletteDisplay({
+ *   getCurrentPalette: () => currentPalette,
+ *   setCurrentPalette: (p) => { currentPalette = p; },
+ *   getLockedColors: () => lockedColors,
+ *   convertImageCallback: convertImage,
+ * });
+ */
 export function createPaletteDisplay(options) {
   const {
     getCurrentPalette,
@@ -19,6 +62,10 @@ export function createPaletteDisplay(options) {
   } = options;
 
   const paletteDisplay = {
+    /**
+     * Display a palette and count pixels for each color
+     * @param {PaletteColor[]} palette - Array of RGB colors
+     */
     displayPalette(palette) {
       setCurrentPalette(palette);
 
@@ -53,6 +100,9 @@ export function createPaletteDisplay(options) {
       this.renderPaletteDisplay();
     },
 
+    /**
+     * Render the palette display UI with all colors and interactions
+     */
     renderPaletteDisplay() {
       const paletteDisplayEl = document.getElementById("paletteDisplay");
       paletteDisplayEl.innerHTML = "";
