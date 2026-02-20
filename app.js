@@ -4,7 +4,7 @@
 import { openFileWithPicker, saveFileWithPicker } from './src/fileIO.js';
 import { ColorPicker } from './src/colorPicker.js';
 import { createCurvesEditor } from './src/curvesEditor.js';
-import { quantize4bit, rgbToHex } from './src/colorUtils.js';
+import { quantizeColor, rgbToHex, formatHex, getBitDepth } from './src/colorUtils.js';
 import { createPaletteDisplay } from './src/paletteDisplay.js';
 import { createIndexedPNG } from './src/pngExport.js';
 import {
@@ -29,8 +29,8 @@ function getPixelFromClick(canvas, e) {
   return ctx.getImageData(x, y, 1, 1).data;
 }
 
-// Apply all adjustments (curves, brightness, contrast, saturation, gamma) and convert to 12-bit hex
-function getAdjusted12BitHex(r, g, b, curvesEditorRef) {
+// Apply all adjustments (curves, brightness, contrast, saturation, gamma) and convert to quantized hex
+function getAdjustedQuantizedHex(r, g, b, curvesEditorRef) {
   // Apply curves if available
   if (curvesEditorRef && curvesEditorRef.applyToPixel) {
     const adjusted = curvesEditorRef.applyToPixel(r, g, b);
@@ -70,12 +70,13 @@ function getAdjusted12BitHex(r, g, b, curvesEditorRef) {
   g = Math.max(0, Math.min(255, Math.round(g)));
   b = Math.max(0, Math.min(255, Math.round(b)));
 
-  // Convert to 12-bit color (4 bits per channel)
-  const r12bit = Math.floor(r / 17) * 17;
-  const g12bit = Math.floor(g / 17) * 17;
-  const b12bit = Math.floor(b / 17) * 17;
+  // Quantize to current bit depth
+  const bitDepth = getBitDepth();
+  const rQ = quantizeColor(r, bitDepth);
+  const gQ = quantizeColor(g, bitDepth);
+  const bQ = quantizeColor(b, bitDepth);
 
-  return rgbToHex(r12bit, g12bit, b12bit);
+  return rgbToHex(rQ, gQ, bQ);
 }
 
 // Toggle locked color state and reconvert
@@ -222,6 +223,7 @@ async function convertImage() {
       ...adj,
       curvesLUTs: curvesEditor.getCurvesLUTs(),
       colorCount: conv.colorCount,
+      bitDepth: conv.bitDepth,
       quantMethod: conv.quantMethod,
       colorDistance: conv.colorDistance,
       lockedColors: Array.from(lockedColors),
@@ -509,6 +511,7 @@ const continuousControls = [
 ];
 
 const discreteControls = [
+  "bitDepth",
   "quantMethod",
   "ditherMethod",
   "bayerSize",
@@ -825,16 +828,16 @@ Object.entries(sliderDefaults).forEach(([sliderId, defaultValue]) => {
 document.getElementById("previewCanvas").addEventListener("mousemove", (e) => {
   const canvas = document.getElementById("previewCanvas");
   const pixel = getPixelFromClick(canvas, e);
+  const bitDepth = getBitDepth();
 
-  // Convert to 12-bit format for comparison
-  const r4bit = Math.floor(pixel[0] / 17).toString(16);
-  const g4bit = Math.floor(pixel[1] / 17).toString(16);
-  const b4bit = Math.floor(pixel[2] / 17).toString(16);
-  const pixelColor12bit = `#${r4bit}${g4bit}${b4bit}`.toUpperCase();
+  // Convert to appropriate format for comparison based on bit depth
+  const pixelColorHex = formatHex(pixel[0], pixel[1], pixel[2], bitDepth);
 
-  // Find matching palette color
+  // Find matching palette color by comparing the tooltip's hex portion
   document.querySelectorAll(".palette-color").forEach((el) => {
-    if (el.dataset.rgb === pixelColor12bit) {
+    const tooltip = el.dataset.rgb || "";
+    const tooltipHex = tooltip.split(" ")[0]; // Get the hex part before the bullet
+    if (tooltipHex === pixelColorHex) {
       el.classList.add("highlighted");
     } else {
       el.classList.remove("highlighted");
@@ -860,7 +863,7 @@ document.getElementById("previewCanvas").addEventListener("click", (e) => {
 document.getElementById("originalCanvas").addEventListener("click", (e) => {
   const canvas = document.getElementById("originalCanvas");
   const pixel = getPixelFromClick(canvas, e);
-  const hexColor = getAdjusted12BitHex(pixel[0], pixel[1], pixel[2], curvesEditor);
+  const hexColor = getAdjustedQuantizedHex(pixel[0], pixel[1], pixel[2], curvesEditor);
   toggleLockedColor(hexColor);
 });
 
@@ -876,7 +879,7 @@ document.getElementById("slidePreviewCanvas").addEventListener("click", (e) => {
 document.getElementById("slideOriginalCanvas").addEventListener("click", (e) => {
   const canvas = document.getElementById("slideOriginalCanvas");
   const pixel = getPixelFromClick(canvas, e);
-  const hexColor = getAdjusted12BitHex(pixel[0], pixel[1], pixel[2], curvesEditor);
+  const hexColor = getAdjustedQuantizedHex(pixel[0], pixel[1], pixel[2], curvesEditor);
   toggleLockedColor(hexColor);
 });
 
@@ -1065,17 +1068,18 @@ function extractPLTEChunk(bytes) {
       // Found palette chunk - extract RGB triplets
       const palette = [];
       const numColors = length / 3;
+      const bitDepth = getBitDepth();
 
       for (let i = 0; i < numColors; i++) {
         const r = bytes[offset + i * 3];
         const g = bytes[offset + i * 3 + 1];
         const b = bytes[offset + i * 3 + 2];
 
-        // Quantize to 12-bit (Amiga format)
+        // Quantize to current bit depth
         palette.push({
-          r: quantize4bit(r),
-          g: quantize4bit(g),
-          b: quantize4bit(b),
+          r: quantizeColor(r, bitDepth),
+          g: quantizeColor(g, bitDepth),
+          b: quantizeColor(b, bitDepth),
         });
       }
 
@@ -1113,6 +1117,7 @@ async function extractUniqueColors(file) {
         const uniqueColors = [];
         const colorSet = new Set();
 
+        const bitDepth = getBitDepth();
         for (let i = 0; i < data.length; i += 4) {
           const r = data[i];
           const g = data[i + 1];
@@ -1128,9 +1133,9 @@ async function extractUniqueColors(file) {
           if (!colorSet.has(key)) {
             colorSet.add(key);
             uniqueColors.push({
-              r: quantize4bit(r),
-              g: quantize4bit(g),
-              b: quantize4bit(b),
+              r: quantizeColor(r, bitDepth),
+              g: quantizeColor(g, bitDepth),
+              b: quantizeColor(b, bitDepth),
             });
           }
 

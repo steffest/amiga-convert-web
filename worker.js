@@ -1,9 +1,15 @@
 // Web Worker for image processing
 // This runs in a background thread to keep the UI responsive
 
-// Quantize to 4-bit per channel (12-bit color)
-function quantize4bit(value) {
-  return Math.floor(value / 17) * 17;
+// Quantize color channel based on bit depth
+function quantizeColor(value, bitDepth) {
+  if (bitDepth === 24) return Math.round(value);
+  if (bitDepth === 9) {
+    // 3 bits per channel = 8 levels (0-7)
+    return Math.round(Math.round(value * 7 / 255) * 255 / 7);
+  }
+  // 12-bit: 4 bits per channel = 16 levels (0-15)
+  return Math.round(value / 17) * 17;
 }
 
 // Color distance metrics
@@ -278,7 +284,7 @@ function applyAdjustments(imageData, params) {
 }
 
 // Median Cut quantization
-function medianCut(pixels, colorCount) {
+function medianCut(pixels, colorCount, bitDepth) {
   let boxes = [{ pixels: pixels }];
 
   while (boxes.length < colorCount) {
@@ -356,33 +362,33 @@ function medianCut(pixels, colorCount) {
     }
     const count = box.pixels.length;
     return {
-      r: quantize4bit(Math.round(r / count)),
-      g: quantize4bit(Math.round(g / count)),
-      b: quantize4bit(Math.round(b / count)),
+      r: quantizeColor(r / count, bitDepth),
+      g: quantizeColor(g / count, bitDepth),
+      b: quantizeColor(b / count, bitDepth),
     };
   });
 }
 
 // Median cut wrapper - extracts pixels from imageData and calls medianCut
-function medianCutQuantization(imageData, colorCount, metric) {
+function medianCutQuantization(imageData, colorCount, metric, bitDepth) {
   const data = imageData.data;
   const pixels = [];
 
   const step = Math.max(1, Math.floor(data.length / (4 * 10000)));
   for (let i = 0; i < data.length; i += 4 * step) {
     pixels.push({
-      r: quantize4bit(data[i]),
-      g: quantize4bit(data[i + 1]),
-      b: quantize4bit(data[i + 2]),
+      r: quantizeColor(data[i], bitDepth),
+      g: quantizeColor(data[i + 1], bitDepth),
+      b: quantizeColor(data[i + 2], bitDepth),
     });
   }
 
-  return medianCut(pixels, colorCount);
+  return medianCut(pixels, colorCount, bitDepth);
 }
 
 // Wu quantization - variance-based box splitting
 // Unlike median cut which splits by range, Wu's algorithm minimizes variance
-function wuQuantization(imageData, colorCount, metric) {
+function wuQuantization(imageData, colorCount, metric, bitDepth) {
   const data = imageData.data;
   const pixels = [];
 
@@ -390,9 +396,9 @@ function wuQuantization(imageData, colorCount, metric) {
   const step = Math.max(1, Math.floor(data.length / (4 * 10000)));
   for (let i = 0; i < data.length; i += 4 * step) {
     pixels.push({
-      r: quantize4bit(data[i]),
-      g: quantize4bit(data[i + 1]),
-      b: quantize4bit(data[i + 2]),
+      r: quantizeColor(data[i], bitDepth),
+      g: quantizeColor(data[i + 1], bitDepth),
+      b: quantizeColor(data[i + 2], bitDepth),
     });
   }
 
@@ -513,9 +519,9 @@ function wuQuantization(imageData, colorCount, metric) {
     }
     const count = box.pixels.length;
     return {
-      r: quantize4bit(Math.round(r / count)),
-      g: quantize4bit(Math.round(g / count)),
-      b: quantize4bit(Math.round(b / count)),
+      r: quantizeColor(r / count, bitDepth),
+      g: quantizeColor(g / count, bitDepth),
+      b: quantizeColor(b / count, bitDepth),
     };
   });
 }
@@ -530,7 +536,7 @@ function seededRandom(seed) {
 }
 
 // NeuQuant (k-means clustering)
-function neuQuantization(imageData, colorCount, metric) {
+function neuQuantization(imageData, colorCount, metric, bitDepth) {
   const data = imageData.data;
   const pixels = [];
 
@@ -637,21 +643,21 @@ function neuQuantization(imageData, colorCount, metric) {
   }
 
   return centroids.map((c) => ({
-    r: quantize4bit(Math.round(c.r)),
-    g: quantize4bit(Math.round(c.g)),
-    b: quantize4bit(Math.round(c.b)),
+    r: quantizeColor(c.r, bitDepth),
+    g: quantizeColor(c.g, bitDepth),
+    b: quantizeColor(c.b, bitDepth),
   }));
 }
 
 // RGB Quantization
-function rgbQuantization(imageData, colorCount, metric) {
+function rgbQuantization(imageData, colorCount, metric, bitDepth) {
   const data = imageData.data;
   const colorMap = new Map();
 
   for (let i = 0; i < data.length; i += 4) {
-    const r = quantize4bit(data[i]);
-    const g = quantize4bit(data[i + 1]);
-    const b = quantize4bit(data[i + 2]);
+    const r = quantizeColor(data[i], bitDepth);
+    const g = quantizeColor(data[i + 1], bitDepth);
+    const b = quantizeColor(data[i + 2], bitDepth);
     const key = `${r},${g},${b}`;
     colorMap.set(key, (colorMap.get(key) || 0) + 1);
   }
@@ -772,9 +778,9 @@ function selectBestLockedColors(imageData, lockedPalette, colorCount, metric) {
 }
 
 // Build palette
-// params: { colorCount, quantMethod, colorDistance, lockedColors }
+// params: { colorCount, quantMethod, colorDistance, lockedColors, bitDepth }
 function buildPalette(imageData, params) {
-  const { colorCount, quantMethod: method, colorDistance: metric, lockedColors } = params;
+  const { colorCount, quantMethod: method, colorDistance: metric, lockedColors, bitDepth } = params;
   let palette;
 
   const lockedPalette = lockedColors.map(hex => {
@@ -782,9 +788,9 @@ function buildPalette(imageData, params) {
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return {
-      r: quantize4bit(r),
-      g: quantize4bit(g),
-      b: quantize4bit(b),
+      r: quantizeColor(r, bitDepth),
+      g: quantizeColor(g, bitDepth),
+      b: quantizeColor(b, bitDepth),
     };
   });
 
@@ -798,17 +804,17 @@ function buildPalette(imageData, params) {
 
   switch (method) {
     case "median-cut":
-      palette = medianCutQuantization(imageData, remainingColors, metric);
+      palette = medianCutQuantization(imageData, remainingColors, metric, bitDepth);
       break;
     case "wuquant":
-      palette = wuQuantization(imageData, remainingColors, metric);
+      palette = wuQuantization(imageData, remainingColors, metric, bitDepth);
       break;
     case "neuquant":
-      palette = neuQuantization(imageData, remainingColors, metric);
+      palette = neuQuantization(imageData, remainingColors, metric, bitDepth);
       break;
     case "rgbquant":
     default:
-      palette = rgbQuantization(imageData, remainingColors, metric);
+      palette = rgbQuantization(imageData, remainingColors, metric, bitDepth);
       break;
   }
 
@@ -831,9 +837,9 @@ function buildPalette(imageData, params) {
     const data = imageData.data;
     const imageColors = new Set();
     for (let i = 0; i < data.length; i += 4) {
-      const r = quantize4bit(data[i]);
-      const g = quantize4bit(data[i + 1]);
-      const b = quantize4bit(data[i + 2]);
+      const r = quantizeColor(data[i], bitDepth);
+      const g = quantizeColor(data[i + 1], bitDepth);
+      const b = quantizeColor(data[i + 2], bitDepth);
       const key = `${r},${g},${b}`;
       if (!seen.has(key)) {
         imageColors.add(key);

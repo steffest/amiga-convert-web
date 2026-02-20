@@ -1,5 +1,7 @@
 // Color Picker UI component
 
+import { quantizeColor, formatHex, getBitDepth } from './colorUtils.js';
+
 /**
  * @typedef {Object} ColorPickerInstance
  * @property {HTMLElement} container - Container element
@@ -16,9 +18,9 @@
  */
 
 /**
- * Color Picker UI component for selecting 12-bit Amiga colors
+ * Color Picker UI component for selecting colors at configurable bit depth
  * Provides HSV-based color selection with saturation/value square and hue strip.
- * All colors are quantized to 12-bit (4 bits per channel).
+ * All colors are quantized based on the current bit depth setting.
  */
 export const ColorPicker = {
   /**
@@ -83,17 +85,19 @@ export const ColorPicker = {
   },
 
   /**
-   * Quantize RGB to 12-bit color (4 bits per channel)
+   * Quantize RGB to current bit depth
    * @param {number} r - Red (0-255)
    * @param {number} g - Green (0-255)
    * @param {number} b - Blue (0-255)
-   * @returns {number[]} Quantized RGB as [r, g, b] (values: 0, 17, 34, ... 255)
+   * @returns {number[]} Quantized RGB as [r, g, b]
    */
-  quantize12bit(r, g, b) {
-    const r4 = Math.floor(r / 17);
-    const g4 = Math.floor(g / 17);
-    const b4 = Math.floor(b / 17);
-    return [r4 * 17, g4 * 17, b4 * 17];
+  quantizeRgb(r, g, b) {
+    const bitDepth = getBitDepth();
+    return [
+      quantizeColor(r, bitDepth),
+      quantizeColor(g, bitDepth),
+      quantizeColor(b, bitDepth)
+    ];
   },
 
   /**
@@ -120,17 +124,15 @@ export const ColorPicker = {
   },
 
   /**
-   * Convert RGB to 3-digit hex string (12-bit color)
+   * Convert RGB to hex string based on current bit depth
    * @param {number} r - Red (0-255)
    * @param {number} g - Green (0-255)
    * @param {number} b - Blue (0-255)
-   * @returns {string} Hex string like "#F0A"
+   * @returns {string} Hex string like "#F0A" or "#FF00AA"
    */
   rgbToHex3(r, g, b) {
-    const r4 = Math.floor(r / 17).toString(16);
-    const g4 = Math.floor(g / 17).toString(16);
-    const b4 = Math.floor(b / 17).toString(16);
-    return `#${r4}${g4}${b4}`.toUpperCase();
+    const bitDepth = getBitDepth();
+    return formatHex(r, g, b, bitDepth);
   },
 
   /**
@@ -200,7 +202,7 @@ export const ColorPicker = {
           const s = x / (width - 1);
           const v = 1 - y / (height - 1);
           let [r, g, b] = this.hsvToRgb(h, s, v);
-          [r, g, b] = this.quantize12bit(r, g, b);
+          [r, g, b] = this.quantizeRgb(r, g, b);
           const i = (y * width + x) * 4;
           imageData.data[i] = r;
           imageData.data[i + 1] = g;
@@ -304,7 +306,7 @@ export const ColorPicker = {
     picker.hexInput.addEventListener('input', () => {
       const rgb = this.parseHex(picker.hexInput.value);
       if (rgb) {
-        const [r, g, b] = this.quantize12bit(...rgb);
+        const [r, g, b] = this.quantizeRgb(...rgb);
         picker.hsv = this.rgbToHsv(r, g, b);
         picker.drawSquare();
         this.updateCursors(picker);
@@ -320,7 +322,7 @@ export const ColorPicker = {
    * @param {number[]} rgb - RGB color as [r, g, b]
    */
   setColor(picker, [r, g, b]) {
-    [r, g, b] = this.quantize12bit(r, g, b);
+    [r, g, b] = this.quantizeRgb(r, g, b);
     picker.hsv = this.rgbToHsv(r, g, b);
     picker.drawSquare();
     this.updateCursors(picker);
@@ -338,7 +340,7 @@ export const ColorPicker = {
    */
   updateFromHsv(picker) {
     let [r, g, b] = this.hsvToRgb(...picker.hsv);
-    [r, g, b] = this.quantize12bit(r, g, b);
+    [r, g, b] = this.quantizeRgb(r, g, b);
     this.updateCursors(picker);
     this.updatePreview(picker, r, g, b);
     if (picker.hexInput) {

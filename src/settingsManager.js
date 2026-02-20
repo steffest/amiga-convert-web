@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS = {
   version: 1,
   conversion: {
     colors: 32,
+    bitDepth: 12,
     quantMethod: 'rgbquant',
     colorDistance: 'rgb-euclidean',
     ditherMethod: 'floyd-steinberg',
@@ -85,6 +86,7 @@ export function getAdjustmentValues() {
 export function getConversionValues() {
   return {
     colorCount: parseInt(document.getElementById("colors").value),
+    bitDepth: parseInt(document.getElementById("bitDepth").value),
     quantMethod: document.getElementById("quantMethod").value,
     colorDistance: document.getElementById("colorDistance").value,
     ditherMethod: document.getElementById("ditherMethod").value,
@@ -171,6 +173,7 @@ export function gatherSettings(curvesEditor) {
     version: 1,
     conversion: {
       colors: conv.colorCount,
+      bitDepth: conv.bitDepth,
       quantMethod: conv.quantMethod,
       colorDistance: conv.colorDistance,
       ditherMethod: conv.ditherMethod,
@@ -212,6 +215,9 @@ export function applySettings(settings, curvesEditor) {
     if (c.colors !== undefined) {
       document.getElementById("colors").value = c.colors;
       document.getElementById("colorsNumber").value = c.colors;
+    }
+    if (c.bitDepth !== undefined) {
+      document.getElementById("bitDepth").value = c.bitDepth;
     }
     if (c.quantMethod !== undefined) {
       document.getElementById("quantMethod").value = c.quantMethod;

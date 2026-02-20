@@ -1,6 +1,6 @@
 // Palette display and interaction
 
-import { rgbToHex } from './colorUtils.js';
+import { rgbToHex, formatHex, getBitDepth } from './colorUtils.js';
 
 /** @type {number|null} Interval ID for color flashing effect */
 let flashInterval = null;
@@ -120,15 +120,13 @@ export function createPaletteDisplay(options) {
         // Convert to hex for internal storage (6-digit)
         const hexColor = rgbToHex(color.r, color.g, color.b);
 
-        // Convert to 12-bit format for tooltip
-        const r4bit = Math.floor(color.r / 17).toString(16);
-        const g4bit = Math.floor(color.g / 17).toString(16);
-        const b4bit = Math.floor(color.b / 17).toString(16);
-        const hex12bit = `#${r4bit}${g4bit}${b4bit}`.toUpperCase();
+        // Convert to appropriate format for tooltip based on bit depth
+        const bitDepth = getBitDepth();
+        const hexDisplay = formatHex(color.r, color.g, color.b, bitDepth);
 
         // Format pixel count with thousands separator
         const pixelCount = (palettePixelCounts.get(hexColor) || 0).toLocaleString();
-        const tooltipText = `${hex12bit} • ${pixelCount} px`;
+        const tooltipText = `${hexDisplay} • ${pixelCount} px`;
 
         colorDiv.setAttribute("data-rgb", tooltipText);
         colorDiv.setAttribute("data-rgb-full", hexColor);
@@ -338,13 +336,11 @@ export function createPaletteDisplay(options) {
         colorDiv.className = "palette-color locked disabled";
         colorDiv.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
 
-        // Convert to 12-bit format for tooltip
-        const r4bit = Math.floor(r / 17).toString(16);
-        const g4bit = Math.floor(g / 17).toString(16);
-        const b4bit = Math.floor(b / 17).toString(16);
-        const hex12bit = `#${r4bit}${g4bit}${b4bit}`.toUpperCase();
+        // Convert to appropriate format for tooltip based on bit depth
+        const bitDepth = getBitDepth();
+        const hexDisplay = formatHex(r, g, b, bitDepth);
 
-        const tooltipText = `${hex12bit} • Not used (exceeds color count)`;
+        const tooltipText = `${hexDisplay} • Not used (exceeds color count)`;
         colorDiv.setAttribute("data-rgb", tooltipText);
         colorDiv.setAttribute("data-rgb-full", hexColor);
 
