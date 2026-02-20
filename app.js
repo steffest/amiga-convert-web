@@ -427,6 +427,15 @@ function loadImageFile(file) {
   reader.readAsDataURL(file);
 }
 
+// Update preview title based on bit depth
+function updatePreviewTitle() {
+  const bitDepth = getBitDepth();
+  const title = document.getElementById("previewTitle");
+  if (title) {
+    title.textContent = `${bitDepth}-bit Preview`;
+  }
+}
+
 // Initialize page state on load
 window.addEventListener("DOMContentLoaded", () => {
   // Reset to empty state
@@ -441,6 +450,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Apply default settings (prevents browser form persistence)
   applySettings(DEFAULT_SETTINGS, curvesEditor);
+
+  // Update preview title to match default bit depth
+  updatePreviewTitle();
 
   // Reset window state
   window.sourceImage = null;
@@ -529,6 +541,9 @@ discreteControls.forEach((id) => {
   const element = document.getElementById(id);
   element.addEventListener("change", convertImage);
 });
+
+// Update preview title when bit depth changes
+document.getElementById("bitDepth").addEventListener("change", updatePreviewTitle);
 
 // Matte color input converts on change (when user finishes typing)
 document
@@ -692,8 +707,11 @@ document.getElementById("loadSettingsBtn").addEventListener("click", async () =>
     try {
       const text = await file.text();
       const settings = JSON.parse(text);
-      if (applySettings(settings, curvesEditor) && window.sourceImage) {
-        convertImage();
+      if (applySettings(settings, curvesEditor)) {
+        updatePreviewTitle();
+        if (window.sourceImage) {
+          convertImage();
+        }
       }
     } catch (e) {
       alert('Failed to load settings: ' + e.message);
@@ -709,8 +727,11 @@ document.getElementById("settingsInput").addEventListener("change", async (e) =>
   try {
     const text = await file.text();
     const settings = JSON.parse(text);
-    if (applySettings(settings, curvesEditor) && window.sourceImage) {
-      convertImage();
+    if (applySettings(settings, curvesEditor)) {
+      updatePreviewTitle();
+      if (window.sourceImage) {
+        convertImage();
+      }
     }
   } catch (err) {
     alert('Failed to load settings: ' + err.message);
