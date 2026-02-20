@@ -90,9 +90,9 @@ export const ColorPicker = {
    * @returns {number[]} Quantized RGB as [r, g, b] (values: 0, 17, 34, ... 255)
    */
   quantize12bit(r, g, b) {
-    const r4 = Math.round(r / 17);
-    const g4 = Math.round(g / 17);
-    const b4 = Math.round(b / 17);
+    const r4 = Math.floor(r / 17);
+    const g4 = Math.floor(g / 17);
+    const b4 = Math.floor(b / 17);
     return [r4 * 17, g4 * 17, b4 * 17];
   },
 
@@ -127,9 +127,9 @@ export const ColorPicker = {
    * @returns {string} Hex string like "#F0A"
    */
   rgbToHex3(r, g, b) {
-    const r4 = Math.round(r / 17).toString(16);
-    const g4 = Math.round(g / 17).toString(16);
-    const b4 = Math.round(b / 17).toString(16);
+    const r4 = Math.floor(r / 17).toString(16);
+    const g4 = Math.floor(g / 17).toString(16);
+    const b4 = Math.floor(b / 17).toString(16);
     return `#${r4}${g4}${b4}`.toUpperCase();
   },
 
@@ -379,14 +379,4 @@ export const ColorPicker = {
       picker.preview.style.background = `rgb(${r}, ${g}, ${b})`;
     }
   },
-
-  /**
-   * Get the current color from a picker instance
-   * @param {ColorPickerInstance} picker - Picker instance
-   * @returns {number[]} RGB as [r, g, b] (quantized to 12-bit)
-   */
-  getColor(picker) {
-    let [r, g, b] = this.hsvToRgb(...picker.hsv);
-    return this.quantize12bit(r, g, b);
-  }
 };

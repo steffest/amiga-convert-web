@@ -15,6 +15,7 @@ import {
   getConversionValues,
   getAlphaValues,
   parseMatteColor,
+  updateDitherControlVisibility,
 } from './src/settingsManager.js';
 
 // Helper functions to reduce duplication
@@ -70,9 +71,9 @@ function getAdjusted12BitHex(r, g, b, curvesEditorRef) {
   b = Math.max(0, Math.min(255, Math.round(b)));
 
   // Convert to 12-bit color (4 bits per channel)
-  const r12bit = Math.round(r / 17) * 17;
-  const g12bit = Math.round(g / 17) * 17;
-  const b12bit = Math.round(b / 17) * 17;
+  const r12bit = Math.floor(r / 17) * 17;
+  const g12bit = Math.floor(g / 17) * 17;
+  const b12bit = Math.floor(b / 17) * 17;
 
   return rgbToHex(r12bit, g12bit, b12bit);
 }
@@ -490,19 +491,9 @@ function updateControlGroupHeight(element) {
 
 // Show/hide Bayer size control, dither amount, and error dampening
 document.getElementById("ditherMethod").addEventListener("change", (e) => {
-  const method = e.target.value;
-  const bayerControl = document.getElementById("bayerSizeControl");
-  const ditherAmountControl = document.getElementById("ditherAmountControl");
-  const errorDampeningControl = document.getElementById("errorDampeningControl");
-
-  const isErrorDiffusion = method !== "ordered" && method !== "none";
-
-  bayerControl.style.display = method === "ordered" ? "block" : "none";
-  ditherAmountControl.style.display = method === "none" ? "none" : "block";
-  errorDampeningControl.style.display = isErrorDiffusion ? "block" : "none";
-
+  updateDitherControlVisibility(e.target.value);
   // Update the control group height to accommodate the new visibility
-  updateControlGroupHeight(bayerControl);
+  updateControlGroupHeight(document.getElementById("bayerSizeControl"));
 });
 
 // Trigger conversion on any control change

@@ -108,6 +108,30 @@ export function getAlphaValues() {
 }
 
 /**
+ * Parse hex color string to RGB array
+ * Supports 3-digit (#RGB) and 6-digit (#RRGGBB) hex formats
+ * @param {string} hex - Hex color string (# prefix optional)
+ * @returns {number[]|null} RGB as [r, g, b] or null if invalid
+ */
+export function parseHexColor(hex) {
+  hex = hex.replace('#', '').toUpperCase();
+  if (hex.length === 3) {
+    return [
+      parseInt(hex[0] + hex[0], 16),
+      parseInt(hex[1] + hex[1], 16),
+      parseInt(hex[2] + hex[2], 16)
+    ];
+  } else if (hex.length === 6) {
+    return [
+      parseInt(hex.slice(0, 2), 16),
+      parseInt(hex.slice(2, 4), 16),
+      parseInt(hex.slice(4, 6), 16)
+    ];
+  }
+  return null;
+}
+
+/**
  * Parse hex color string to RGB object
  * @param {string} hex - Hex color string (#RGB or #RRGGBB)
  * @returns {{r: number, g: number, b: number}} RGB color object
@@ -116,21 +140,9 @@ export function getAlphaValues() {
  * parseMatteColor('#FF0000') // { r: 255, g: 0, b: 0 }
  */
 export function parseMatteColor(hex) {
-  hex = hex.trim();
-  if (hex.match(/^#[0-9A-Fa-f]{3}$/)) {
-    // 3-digit hex
-    return {
-      r: parseInt(hex[1] + hex[1], 16),
-      g: parseInt(hex[2] + hex[2], 16),
-      b: parseInt(hex[3] + hex[3], 16),
-    };
-  } else if (hex.match(/^#[0-9A-Fa-f]{6}$/)) {
-    // 6-digit hex
-    return {
-      r: parseInt(hex.slice(1, 3), 16),
-      g: parseInt(hex.slice(3, 5), 16),
-      b: parseInt(hex.slice(5, 7), 16),
-    };
+  const rgb = parseHexColor(hex.trim());
+  if (rgb) {
+    return { r: rgb[0], g: rgb[1], b: rgb[2] };
   }
   // Default to white if invalid
   return { r: 255, g: 255, b: 255 };
@@ -209,12 +221,7 @@ export function applySettings(settings, curvesEditor) {
     }
     if (c.ditherMethod !== undefined) {
       document.getElementById("ditherMethod").value = c.ditherMethod;
-      // Update visibility of related controls
-      const method = c.ditherMethod;
-      const isErrorDiffusion = method !== "ordered" && method !== "none";
-      document.getElementById("bayerSizeControl").style.display = method === "ordered" ? "block" : "none";
-      document.getElementById("ditherAmountControl").style.display = method === "none" ? "none" : "block";
-      document.getElementById("errorDampeningControl").style.display = isErrorDiffusion ? "block" : "none";
+      updateDitherControlVisibility(c.ditherMethod);
     }
     if (c.bayerSize !== undefined) {
       document.getElementById("bayerSize").value = c.bayerSize;
@@ -296,4 +303,15 @@ export function applySettings(settings, curvesEditor) {
   });
 
   return true;
+}
+
+/**
+ * Update visibility of dither-related controls based on selected method
+ * @param {string} method - The dither method ('none', 'ordered', 'floyd-steinberg', etc.)
+ */
+export function updateDitherControlVisibility(method) {
+  const isErrorDiffusion = method !== "ordered" && method !== "none";
+  document.getElementById("bayerSizeControl").style.display = method === "ordered" ? "block" : "none";
+  document.getElementById("ditherAmountControl").style.display = method === "none" ? "none" : "block";
+  document.getElementById("errorDampeningControl").style.display = isErrorDiffusion ? "block" : "none";
 }
