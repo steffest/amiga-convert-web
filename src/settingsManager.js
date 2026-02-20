@@ -186,10 +186,9 @@ export function gatherSettings(curvesEditor) {
  * Apply loaded settings to the UI and curves editor
  * @param {Settings} settings - Settings object to apply
  * @param {Object} curvesEditor - The curves editor instance
- * @param {function(): void} [updateTransparencyGridCallback] - Optional callback to update transparency grid
  * @returns {boolean} True if settings were applied successfully
  */
-export function applySettings(settings, curvesEditor, updateTransparencyGridCallback) {
+export function applySettings(settings, curvesEditor) {
   if (!settings || typeof settings !== 'object') {
     alert('Invalid settings file');
     return false;
@@ -275,9 +274,6 @@ export function applySettings(settings, curvesEditor, updateTransparencyGridCall
       document.getElementById("alphaMode").value = a.mode;
       document.getElementById("alphaModeMatteOptions").style.display = a.mode === "matte" ? "flex" : "none";
       document.getElementById("alphaModeThresholdOptions").style.display = a.mode === "threshold" ? "flex" : "none";
-      if (updateTransparencyGridCallback) {
-        updateTransparencyGridCallback();
-      }
     }
     if (a.threshold !== undefined) {
       document.getElementById("alphaThreshold").value = a.threshold;

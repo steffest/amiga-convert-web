@@ -437,7 +437,7 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("imageInput").value = "";
 
   // Apply default settings (prevents browser form persistence)
-  applySettings(DEFAULT_SETTINGS, curvesEditor, null);
+  applySettings(DEFAULT_SETTINGS, curvesEditor);
 
   // Reset window state
   window.sourceImage = null;
@@ -698,7 +698,7 @@ document.getElementById("loadSettingsBtn").addEventListener("click", async () =>
     try {
       const text = await file.text();
       const settings = JSON.parse(text);
-      if (applySettings(settings, curvesEditor, null) && window.sourceImage) {
+      if (applySettings(settings, curvesEditor) && window.sourceImage) {
         convertImage();
       }
     } catch (e) {
@@ -715,7 +715,7 @@ document.getElementById("settingsInput").addEventListener("change", async (e) =>
   try {
     const text = await file.text();
     const settings = JSON.parse(text);
-    if (applySettings(settings, curvesEditor, null) && window.sourceImage) {
+    if (applySettings(settings, curvesEditor) && window.sourceImage) {
       convertImage();
     }
   } catch (err) {
