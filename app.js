@@ -427,6 +427,30 @@ function loadImageFile(file) {
   reader.readAsDataURL(file);
 }
 
+function getImageFileFromClipboardEvent(event) {
+  const items = event.clipboardData?.items;
+  if (!items) return null;
+
+  for (const item of items) {
+    if (item.kind === "file" && item.type.startsWith("image/")) {
+      return item.getAsFile();
+    }
+  }
+
+  return null;
+}
+
+function isTextInputElement(element) {
+  if (!element) return false;
+
+  return (
+    element.tagName === "INPUT" ||
+    element.tagName === "TEXTAREA" ||
+    element.tagName === "SELECT" ||
+    element.isContentEditable
+  );
+}
+
 // Update preview title based on bit depth
 function updatePreviewTitle() {
   const bitDepth = getBitDepth();
@@ -490,6 +514,16 @@ document.getElementById("changeImageBtn").addEventListener("click", async () => 
     [{ description: 'Images', accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'] } }]
   );
   if (file) loadImageFile(file);
+});
+
+document.addEventListener("paste", (e) => {
+  if (isTextInputElement(document.activeElement)) return;
+
+  const file = getImageFileFromClipboardEvent(e);
+  if (!file) return;
+
+  e.preventDefault();
+  loadImageFile(file);
 });
 
 // Helper function to update control group max-height
