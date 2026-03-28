@@ -317,6 +317,12 @@ function updateViewMode() {
     slideContainer.style.justifyContent = "center";
     slideContainer.style.alignItems = "flex-start";
 
+    if (zoomLevel === "fit") {
+      slideContainer.style.width = "100%";
+    }else{
+      slideContainer.style.width = "unset";
+    }
+
     setTimeout(() => {
       updateSlideDivider(currentSlidePosition); // Use stored position
     }, 100);
